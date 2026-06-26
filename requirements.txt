@@ -1,7 +1,18 @@
-SpeechRecognition 
-pyttsx3
 fastapi
-uvicorn
+uvicorn[standard]
+sqlalchemy
+greenlet
+alembic
+asyncpg
+psycopg2-binary
 pydantic
 pydantic-settings
-websockets
+boto3
+httpx
+python-multipart
+# Speech analysis (disfluency detection / scoring) — moved here from the ML service
+librosa
+soundfile
+numpy
+scipy
+pyloudnorm  # ITU-R BS.1770 loudness normalisation in preprocessing (graceful RMS fallback)

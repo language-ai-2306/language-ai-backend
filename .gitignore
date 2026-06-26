@@ -17,8 +17,6 @@ __pycache__/
 build/
 dist/
 *.egg-info/
-.eggs/
-pip-wheel-metadata/
 
 # Virtual environments
 .venv/
@@ -33,18 +31,10 @@ ENV/
 .coverage
 .coverage.*
 htmlcov/
-.tox/
-.nox/
-
-# Type checking / notebooks
-.pyre/
-.ipynb_checkpoints/
 
 # Logs/runtime files
 *.log
 *.pid
-*.out
-*.err
 
 # Environment/secrets
 .env
@@ -55,13 +45,5 @@ htmlcov/
 *.crt
 secrets.*
 
-# Node/npm artifacts (if tooling/scripts are added)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
 # Local tooling
 .python-version
-.cache/
