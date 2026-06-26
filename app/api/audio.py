@@ -35,7 +35,7 @@ DEFAULT_CHILD_AGE = 8
 async def get_defaults() -> dict[str, Any]:
     return {
         "note": "No database required. Point ML_SERVICE_URL at your language-ai-ml (transcription) service.",
-        "ml_client_url": settings.ml_client_url,
+        "ml_service_url": settings.ml_service_url,
         "reference_phrase": DEFAULT_REFERENCE_PHRASE,
         "child_age": DEFAULT_CHILD_AGE,
         "endpoint": "POST /v1/audio/analyze (multipart: audio, reference_phrase, child_age, use_mock)",
