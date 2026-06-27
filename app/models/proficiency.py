@@ -26,7 +26,7 @@ class ProficiencyTest(AbstractEntity):
     __tablename__ = "proficiency_test"
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user_account.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

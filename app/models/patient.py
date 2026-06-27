@@ -21,7 +21,7 @@ from app.db.base import AbstractEntity, Base
 # no extra fields of its own, so it does NOT inherit AbstractEntity; it is just
 # two foreign keys. The unique pair prevents linking the same ailment twice.
 patient_ailment = Table(
-    "patient_ailment",
+    "patient_ailment_assn",
     Base.metadata,
     Column(
         "patient_detail_id",
@@ -41,7 +41,7 @@ class PatientDetail(AbstractEntity):
 
     # One-to-one link to the login account.
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user_account.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )
@@ -49,7 +49,7 @@ class PatientDetail(AbstractEntity):
     # Optional foreign key -> nullable=True. ondelete="SET NULL" means: if the
     # doctor is deleted, the patient is kept but their doctor_id becomes empty.
     doctor_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("doctor.id", ondelete="SET NULL"),
+        ForeignKey("doctor_details.id", ondelete="SET NULL"),
         nullable=True,
     )
 

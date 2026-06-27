@@ -29,7 +29,7 @@ class PhraseDelivery(AbstractEntity):
     __tablename__ = "phrase_delivery"
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user_account.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,  # we filter by user a lot, so index it
     )

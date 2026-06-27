@@ -16,12 +16,12 @@ from app.db.base import AbstractEntity
 
 
 class Doctor(AbstractEntity):
-    __tablename__ = "doctor"
+    __tablename__ = "doctor_details"
 
     # One-to-one link to the login account. unique=True enforces "one doctor row
     # per user".
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("user_account.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )

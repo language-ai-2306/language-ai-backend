@@ -28,7 +28,7 @@ class UserRole(str, enum.Enum):
 
 
 class User(AbstractEntity):
-    __tablename__ = "user_account"  # "user" is a reserved word in PostgreSQL, so avoid it
+    __tablename__ = "user"
 
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
 
