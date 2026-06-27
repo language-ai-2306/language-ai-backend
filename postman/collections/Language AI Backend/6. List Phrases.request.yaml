@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{base_url}}/phrases?difficulty=EASY&limit=10"
+method: GET
+queryParams:
+  difficulty: EASY
+  limit: "10"
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+order: 6000

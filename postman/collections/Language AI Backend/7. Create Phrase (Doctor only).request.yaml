@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{base_url}}/phrases"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "sentence": "A brand new practice sentence.",
+      "ailment_id": 2,
+      "difficulty": "MEDIUM"
+    }
+auth:
+  type: bearer
+  credentials:
+    token: "{{doctor_token}}"
+order: 7000

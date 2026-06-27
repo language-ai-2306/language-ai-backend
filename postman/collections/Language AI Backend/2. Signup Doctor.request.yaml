@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_url}}/auth/signup/doctor"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "{{doctor_email}}",
+      "password": "{{password}}",
+      "first_name": "Doc",
+      "last_name": "Tor",
+      "dob": "1980-01-01",
+      "gender": "F",
+      "qualification": "MBBS",
+      "bio": "Speech therapy expert"
+    }
+order: 2000

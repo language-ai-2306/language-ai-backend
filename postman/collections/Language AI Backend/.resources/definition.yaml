@@ -1,0 +1,11 @@
+$kind: collection
+description: "Ready-to-run requests. Order: Signup -> Login (auto-saves token) -> everything else."
+variables:
+  base_url: http://localhost:8000
+  token: ""
+  doctor_token: ""
+  test_id: ""
+  prof_responses: ""
+  patient_email: patient1@example.com
+  doctor_email: doctor1@example.com
+  password: supersecret123

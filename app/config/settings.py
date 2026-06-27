@@ -9,5 +9,19 @@ class Settings(BaseSettings):
     ml_service_url: str = "http://localhost:8081"
     ml_service_timeout_seconds: float = 30.0
 
+    # --- Auth / JWT -------------------------------------------------------
+    # Secret used to SIGN bearer tokens. MUST be set in .env and kept private;
+    # anyone who knows it can forge logins. Generate one with:
+    #   python -c "import secrets; print(secrets.token_hex(32))"
+    jwt_secret: str = "CHANGE_ME_IN_ENV"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24  # 24 hours
+
+    # --- Game rules -------------------------------------------------------
+    # A phrase shown to a user is not served again to them for this many days.
+    phrase_repeat_block_days: int = 15
+    # How many phrases the proficiency test contains.
+    proficiency_test_phrase_count: int = 40
+
 
 settings = Settings()

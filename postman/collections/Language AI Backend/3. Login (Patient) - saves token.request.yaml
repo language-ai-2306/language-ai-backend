@@ -1,0 +1,16 @@
+$kind: http-request
+url: "{{base_url}}/auth/login"
+method: POST
+body:
+  type: urlencoded
+  content:
+    username: "{{patient_email}}"
+    password: "{{password}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      var json = pm.response.json();
+      pm.collectionVariables.set('token', json.access_token);
+      console.log('Saved patient token');
+    language: text/javascript
+order: 3000

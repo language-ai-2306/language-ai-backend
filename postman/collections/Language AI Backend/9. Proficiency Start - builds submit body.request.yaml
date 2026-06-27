@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{base_url}}/proficiency-test/start"
+method: POST
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      var json = pm.response.json();
+      pm.collectionVariables.set('test_id', json.test_id);
+      var responses = json.phrases.map(function(p){ return { phrase_id: p.id, score: 0.9 }; });
+      pm.collectionVariables.set('prof_responses', JSON.stringify({ responses: responses }));
+      console.log('Saved test_id ' + json.test_id + ' and ' + responses.length + ' responses');
+    language: text/javascript
+order: 9000

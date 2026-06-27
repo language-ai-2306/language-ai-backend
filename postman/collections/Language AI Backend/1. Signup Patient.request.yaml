@@ -1,0 +1,19 @@
+$kind: http-request
+url: "{{base_url}}/auth/signup/patient"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "{{patient_email}}",
+      "password": "{{password}}",
+      "first_name": "Pat",
+      "last_name": "Ient",
+      "dob": "2000-01-01",
+      "gender": "M",
+      "nickname": "patty",
+      "ailment_ids": [2]
+    }
+order: 1000

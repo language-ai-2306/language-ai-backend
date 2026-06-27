@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import audio
+from app.api import audio, auth, phrases, proficiency, users
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -35,6 +35,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.service_name, lifespan=lifespan)
 
 app.include_router(audio.router)
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(phrases.router)
+app.include_router(phrases.game_router)
+app.include_router(proficiency.router)
 
 
 @app.get("/health")

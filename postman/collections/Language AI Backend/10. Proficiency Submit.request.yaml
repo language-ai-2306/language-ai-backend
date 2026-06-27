@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{base_url}}/proficiency-test/{{test_id}}/submit"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: "{{prof_responses}}"
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+order: 10000

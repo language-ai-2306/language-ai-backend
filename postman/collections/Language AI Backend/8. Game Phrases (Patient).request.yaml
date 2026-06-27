@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{base_url}}/game/phrases?difficulty=EASY&count=5"
+method: GET
+queryParams:
+  difficulty: EASY
+  count: "5"
+auth:
+  type: bearer
+  credentials:
+    token: "{{token}}"
+order: 8000

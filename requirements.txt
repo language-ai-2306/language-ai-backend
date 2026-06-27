@@ -7,9 +7,14 @@ asyncpg
 psycopg2-binary
 pydantic
 pydantic-settings
+email-validator        # enables pydantic EmailStr (email format validation)
 boto3
 httpx
 python-multipart
+# Auth: password hashing + JWT bearer tokens
+passlib==1.7.4
+bcrypt==4.0.1          # pinned: passlib 1.7.4 breaks with bcrypt >= 4.1
+PyJWT==2.10.1
 # Speech analysis (disfluency detection / scoring) — moved here from the ML service
 librosa
 soundfile
