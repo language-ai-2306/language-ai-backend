@@ -71,14 +71,15 @@ def upgrade() -> None:
     op.create_index(op.f('ix_ailment_type_guid'), 'ailment_type', ['guid'], unique=True)
     op.create_table('disfluency_phrase',
     sa.Column('sentence', sa.Text(), nullable=False),
-    sa.Column('ailment_id', sa.Integer(), nullable=False),
+    sa.Column('ailment_type_id', sa.Integer(), nullable=False),
+    sa.Column('target_phoneme', sa.String(length=10), nullable=True),
     sa.Column('difficulty', sa.Enum('EASY', 'MEDIUM', 'HARD', name='difficulty_enum'), nullable=False),
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('guid', sa.UUID(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('last_modified_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('created_by', sa.String(length=255), nullable=True),
-    sa.ForeignKeyConstraint(['ailment_id'], ['ailment.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['ailment_type_id'], ['ailment_type.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_disfluency_phrase_guid'), 'disfluency_phrase', ['guid'], unique=True)

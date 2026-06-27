@@ -20,7 +20,7 @@ from app.analysis.acoustic import analyze_audio
 from app.analysis.detector import DisfluencyDetector
 from app.analysis.feedback import FeedbackGenerator
 from app.analysis.recognition import recognize
-from app.analysis.scorer import Scorer
+from app.analysis.scorer import Scorer, compute_attempt_flags
 
 _detector = DisfluencyDetector()
 _scorer = Scorer()
@@ -40,9 +40,9 @@ def analyze(
   recognition = recognize(words, text_disfluencies, features)
   disfluencies = recognition["disfluencies"]
 
-  scores = _scorer.score_session(disfluencies, words, wav_path)
-  feedback = _feedback.generate_feedback(disfluencies)
-  summary = _feedback.generate_summary(scores, child_age)
+  scores = _scorer.score_session(disfluencies, words, wav_path, transcript, reference_phrase)
+  attempt = compute_attempt_flags(scores["fluency_score"], child_age)
+  message = _feedback.generate_summary(scores, child_age)
 
   return {
     "transcript": transcript,
@@ -56,6 +56,6 @@ def analyze(
       "stress_sounds": recognition["stress_sounds"],
     },
     "scores": scores,
-    "feedback": feedback,
-    "summary": summary,
+    "should_retry": attempt["should_retry"],
+    "message": message,
   }

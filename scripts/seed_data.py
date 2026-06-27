@@ -61,7 +61,7 @@ def seed() -> None:
             existing_count = db.scalar(
                 select(func.count())
                 .select_from(DisfluencyPhrase)
-                .where(DisfluencyPhrase.ailment_id == ailment.id)
+                .where(DisfluencyPhrase.ailment_type_id == ailment.id)
             )
             if existing_count and existing_count >= 10:
                 print(f"  {ailment_name} already has {existing_count} phrases — skipping.")
@@ -73,7 +73,7 @@ def seed() -> None:
                     db.add(
                         DisfluencyPhrase(
                             sentence=sentence,
-                            ailment_id=ailment.id,
+                            ailment_type_id=ailment.id,
                             difficulty=difficulty,
                         )
                     )
