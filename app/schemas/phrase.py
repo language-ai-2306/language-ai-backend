@@ -20,9 +20,10 @@ class PhraseUpdate(BaseModel):
 
 
 class PhraseRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: int
     sentence: str
-    ailment_id: int
+    # The ORM column is `ailment_type_id`; expose it as `ailment_id` in the API.
+    ailment_id: int = Field(validation_alias="ailment_type_id")
     difficulty: Difficulty

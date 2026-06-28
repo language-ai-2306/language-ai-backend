@@ -13,9 +13,11 @@ from app.models.conversation import ConversationHistory
 from app.models.avatar import Avatar
 from app.models.delivery import DeliveryContext, PhraseDelivery
 from app.models.disfluency import Difficulty, DisfluencyPhrase
+from app.models.disfluency_occurrence import DisfluencyOccurrence
 from app.models.doctor import Doctor
 from app.models.patient import PatientDetail, patient_ailment
 from app.models.practice_attempt import PracticeAttempt
+from app.models.practice_skill import PracticeSkill
 from app.models.proficiency import ProficiencyTest, ProficiencyTestResponse
 from app.models.user import User, UserRole
 
@@ -27,12 +29,14 @@ __all__ = [
     "AilmentType",
     "Difficulty",
     "DisfluencyPhrase",
+    "DisfluencyOccurrence",
     "User",
     "UserRole",
     "Doctor",
     "PatientDetail",
     "patient_ailment",
     "PracticeAttempt",
+    "PracticeSkill",
     "PhraseDelivery",
     "DeliveryContext",
     "ProficiencyTest",

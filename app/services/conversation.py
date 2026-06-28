@@ -25,6 +25,7 @@ from app.analysis.free_speech import enrich_with_acoustics
 from app.models.conversation import ConversationHistory
 from app.models.user import User
 from app.services import ai_brain
+from app.services import disfluency_tracker
 from app.services.ml_client import MLServiceError, ml_client
 from app.services.storage import presigned_url, upload_audio
 
@@ -188,6 +189,20 @@ async def process_turn(
     db.add(turn)
     db.commit()
     db.refresh(turn)
+
+    # ── 8. Track disfluencies for the child's profile (drives targeted practice).
+    # Secondary to the reply — never let a tracking error break the turn.
+    try:
+        disfluency_tracker.record_occurrences(
+            db,
+            user_id=user.id,
+            disfluencies=disfluencies,
+            source="conversation",
+            session_id=session_id,
+            turn_id=turn.id,
+        )
+    except Exception:  # noqa: BLE001
+        logger.warning("disfluency tracking failed for turn %s", turn.id, exc_info=True)
 
     return {
         "turn_id": turn.id,

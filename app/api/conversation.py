@@ -20,6 +20,7 @@ from app.core.deps import get_current_user, require_role
 from app.db.base import get_db
 from app.models.user import User, UserRole
 from app.schemas.conversation import (
+    DisfluencyProfileResponse,
     PatientProgressResponse,
     SessionEndResponse,
     SessionListResponse,
@@ -28,6 +29,7 @@ from app.schemas.conversation import (
     TurnResponse,
 )
 from app.services import conversation as conv_service
+from app.services import disfluency_tracker
 from app.services.ml_client import MLServiceError
 
 from fastapi import Depends
@@ -228,6 +230,30 @@ def get_patient_progress(
     """
     result = conv_service.get_patient_progress(db, user_id, limit=limit)
     return PatientProgressResponse(**result)
+
+
+# ── Disfluency profile (doctor only) ─────────────────────────────────────────
+
+@router.get(
+    "/patients/{user_id}/disfluency-profile",
+    response_model=DisfluencyProfileResponse,
+    summary="Get a patient's disfluency profile (top problem sounds / types / words)",
+    responses={403: {"description": "Doctor role required"}},
+)
+def get_patient_disfluency_profile(
+    user_id: int,
+    window_days: int = 90,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(UserRole.DOCTOR)),
+) -> DisfluencyProfileResponse:
+    """
+    Aggregates every disfluency caught in the patient's conversations over the
+    last `window_days` into a ranked profile: which **sounds**, **types** and
+    **words** they struggle with most (severity-weighted). The `by_sound` list
+    is what drives targeted Repeat-After-Me phrase selection.
+    """
+    result = disfluency_tracker.get_disfluency_profile(db, user_id, window_days=window_days)
+    return DisfluencyProfileResponse(**result)
 
 
 # ── Private helper ────────────────────────────────────────────────────────────

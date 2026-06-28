@@ -34,7 +34,9 @@ from app.db.base import get_db
 from app.models.disfluency import DisfluencyPhrase
 from app.models.user import User, UserRole
 from app.services import practice as practice_service
+from app.services import practice_planner
 from app.services import storage
+from app.schemas.practice import PracticeSkillResponse
 from app.services.ml_client import MLServiceError, ml_client
 
 logger = logging.getLogger(__name__)
@@ -196,6 +198,14 @@ async def submit_attempt(
         audio_url=audio_url,
     )
 
+    # Feedback loop: feed disfluencies into the unified profile and update the
+    # child's per-sound mastery (promote/demote difficulty). Secondary — never
+    # let it break the response.
+    try:
+        practice_planner.process_attempt(db, attempt)
+    except Exception:  # noqa: BLE001
+        logger.warning("practice feedback loop failed for attempt %s", attempt.id, exc_info=True)
+
     return {
         "attempt_id": attempt.id,
         "attempt_guid": str(attempt.guid),
@@ -203,3 +213,21 @@ async def submit_attempt(
         "audio_url": audio_url,
         **result,
     }
+
+
+@router.get(
+    "/patients/{user_id}/practice-skill",
+    response_model=PracticeSkillResponse,
+    summary="Get a patient's per-sound practice mastery matrix",
+    responses={403: {"description": "Doctor role required"}},
+)
+def get_practice_skill(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_role(UserRole.DOCTOR)),
+) -> PracticeSkillResponse:
+    """
+    The patient's adaptive mastery state, one row per practised sound (worst
+    first): current difficulty, mastery level, attempts, and recency-weighted %SS.
+    """
+    return PracticeSkillResponse(**practice_planner.get_practice_skill(db, user_id))

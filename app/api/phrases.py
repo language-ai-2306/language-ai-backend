@@ -11,7 +11,9 @@ from app.models.delivery import DeliveryContext
 from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.models.user import User, UserRole
 from app.schemas.phrase import PhraseCreate, PhraseRead, PhraseUpdate
+from app.schemas.practice import TargetedPhrasesResponse
 from app.services import phrase as phrase_service
+from app.services import practice_planner
 from app.services.game import record_deliveries, select_unseen_phrases
 
 # ---------------------------------------------------------------------------
@@ -137,3 +139,26 @@ def get_game_phrases(
     record_deliveries(db, current_user.id, phrases, DeliveryContext.GAME)
     db.commit()
     return phrases
+
+
+@game_router.get(
+    "/targeted-phrases",
+    response_model=TargetedPhrasesResponse,
+    summary="Get a personalised, adaptive batch of practice phrases",
+    response_description="Phrases aimed at the patient's problem sounds, at their current difficulty",
+    responses={403: {"description": "Patient role required"}},
+)
+def get_targeted_phrases(
+    count: int = Query(10, ge=1, le=50, description="How many phrases to return"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.PATIENT)),
+) -> TargetedPhrasesResponse:
+    """
+    Adaptive 'Repeat After Me' batch. Uses the patient's disfluency profile (from
+    conversation **and** past practice) to target their problem sounds, serves each
+    sound at the difficulty their mastery has reached, mixes across several sounds,
+    and respects the cooldown. New patients (no profile yet) get a balanced warm-up
+    set. Each phrase comes with a short reason it was chosen.
+    """
+    result = practice_planner.build_practice_set(db, current_user.id, count=count)
+    return TargetedPhrasesResponse(**result)

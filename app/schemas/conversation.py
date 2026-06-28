@@ -91,3 +91,22 @@ class PatientProgressResponse(BaseModel):
     user_id: int
     sessions_analysed: int
     trend: list[ProgressPoint]  # oldest first
+
+
+# ── Disfluency profile (doctor) ───────────────────────────────────────────────
+
+class ProfileBucket(BaseModel):
+    """One ranked entry in a disfluency profile (a sound, type, or word)."""
+    value: str
+    count: int               # how many times it occurred
+    severity_score: int      # severity-weighted total (mild=1, moderate=2, severe=3)
+
+
+class DisfluencyProfileResponse(BaseModel):
+    user_id: int
+    window_days: int
+    total_occurrences: int
+    last_seen: datetime | None
+    by_sound: list[ProfileBucket]   # top problem sounds → drives targeted practice
+    by_type: list[ProfileBucket]    # repetition / prolongation / block / ...
+    by_word: list[ProfileBucket]    # words most often stumbled on
