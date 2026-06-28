@@ -19,6 +19,7 @@ class Difficulty(str, enum.Enum):
     EASY = "EASY"
     MEDIUM = "MEDIUM"
     HARD = "HARD"
+    TONGUE_TWISTER = "TONGUE_TWISTER"
 
 
 class DisfluencyPhrase(AbstractEntity):

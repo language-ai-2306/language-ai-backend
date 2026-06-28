@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24  # 24 hours
 
+    # --- AWS S3 -----------------------------------------------------------
+    s3_bucket_name: str = ""  # e.g. "language-ai-audio"
+
     # --- Game rules -------------------------------------------------------
     # A phrase shown to a user is not served again to them for this many days.
     phrase_repeat_block_days: int = 15
