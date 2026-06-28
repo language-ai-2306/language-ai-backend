@@ -8,16 +8,19 @@ Importing every model here does two jobs:
 """
 
 from app.models.ailment import Ailment, AilmentType
+from app.models.app_config import AppConfig
 from app.models.conversation import ConversationHistory
 from app.models.avatar import Avatar
 from app.models.delivery import DeliveryContext, PhraseDelivery
 from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.models.doctor import Doctor
 from app.models.patient import PatientDetail, patient_ailment
+from app.models.practice_attempt import PracticeAttempt
 from app.models.proficiency import ProficiencyTest, ProficiencyTestResponse
 from app.models.user import User, UserRole
 
 __all__ = [
+    "AppConfig",
     "ConversationHistory",
     "Avatar",
     "Ailment",
@@ -29,6 +32,7 @@ __all__ = [
     "Doctor",
     "PatientDetail",
     "patient_ailment",
+    "PracticeAttempt",
     "PhraseDelivery",
     "DeliveryContext",
     "ProficiencyTest",

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import audio, auth, phrases, proficiency, users
+from app.api import admin, audio, auth, conversation, phrases, proficiency, users
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,42 @@ TAGS_METADATA = [
         "description": "Audio analysis pipeline. Upload a WAV/MP3 recording and receive a full "
                        "disfluency breakdown, fluency score, coverage score, and retry flag.",
     },
+    {
+        "name": "conversation",
+        "description": "Conversational AI sessions. Start a session, submit audio turns, "
+                       "and receive AI-generated replies with synthesised voice. "
+                       "Doctors can retrieve full session transcripts.",
+    },
+    {
+        "name": "admin",
+        "description": "Runtime configuration management. **Doctor role required.** "
+                       "Read and update business rules (phrase cooldown days, test size, etc.) "
+                       "without a code deploy.",
+    },
 ]
+
+
+def _run_migrations() -> None:
+    if not settings.database_url:
+        logger.warning("DATABASE_URL not set — skipping migrations")
+        return
+    try:
+        from alembic import command
+        from alembic.config import Config
+        import os
+        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+        # Alembic needs a sync driver — strip +asyncpg if present.
+        # connect_timeout=10 prevents an unreachable DB from hanging startup forever.
+        sync_url = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+        if "connect_timeout" not in sync_url:
+            sep = "&" if "?" in sync_url else "?"
+            sync_url = f"{sync_url}{sep}connect_timeout=10"
+        alembic_cfg.set_main_option("sqlalchemy.url", sync_url)
+        command.upgrade(alembic_cfg, "head")
+        logger.info("✓ Migrations applied")
+    except Exception as exc:
+        logger.error("✗ Migration failed: %s", exc)
+        raise
 
 
 async def _check_db() -> None:
@@ -60,6 +95,7 @@ async def _check_db() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _run_migrations()
     await _check_db()
     yield
 
@@ -83,12 +119,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(admin.router)
 app.include_router(audio.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(phrases.router)
 app.include_router(phrases.game_router)
 app.include_router(proficiency.router)
+app.include_router(conversation.router)
 
 
 @app.get("/health", tags=["health"], summary="Health check")

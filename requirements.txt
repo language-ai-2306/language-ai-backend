@@ -15,9 +15,14 @@ python-multipart
 passlib==1.7.4
 bcrypt==4.0.1          # pinned: passlib 1.7.4 breaks with bcrypt >= 4.1
 PyJWT==2.10.1
+# Conversational AI
+anthropic                # Claude API — AI character brain
 # Speech analysis (disfluency detection / scoring) — moved here from the ML service
 librosa
 soundfile
 numpy
 scipy
 pyloudnorm  # ITU-R BS.1770 loudness normalisation in preprocessing (graceful RMS fallback)
+# Testing
+pytest
+pytest-mock

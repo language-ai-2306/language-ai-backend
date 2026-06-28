@@ -2,14 +2,15 @@
 Game/phrase-selection logic — the rules that decide which phrases a patient gets.
 
 The key rule: a phrase shown to a user must NOT be served to them again for
-`settings.phrase_repeat_block_days` (15) days. We enforce this by excluding any
-phrase that appears in `phrase_delivery` for this user within the cutoff window.
+`phrase_repeat_block_days` days (runtime value from app_config). We enforce this
+by excluding any phrase that appears in `phrase_delivery` for this user within
+the cutoff window.
 
 Two reusable functions:
   * select_unseen_phrases(...) -> picks N random eligible phrases.
   * record_deliveries(...)     -> writes a phrase_delivery row for each phrase
-                                  shown, which is what makes the 15-day rule
-                                  work next time.
+                                  shown, which is what makes the cooldown work
+                                  next time.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -22,6 +23,7 @@ from app.config.settings import settings
 from app.models.delivery import DeliveryContext, PhraseDelivery
 from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.models.patient import PatientDetail, patient_ailment
+from app.services import config_service
 
 
 def get_patient_ailment_ids(db: Session, user_id: int) -> List[int]:
@@ -50,9 +52,12 @@ def select_unseen_phrases(
     last 15 days. Optionally filter by difficulty and/or the patient's ailments.
 
     If fewer than `count` eligible phrases exist, returns however many there are
-    (we never break the 15-day rule just to hit the count).
+    (we never break the cooldown rule just to hit the count).
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.phrase_repeat_block_days)
+    block_days = config_service.get_int(
+        "phrase_repeat_block_days", db, default=settings.phrase_repeat_block_days
+    )
+    cutoff = datetime.now(timezone.utc) - timedelta(days=block_days)
 
     # Phrase ids already shown to this user within the block window.
     recently_shown = (

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.config.settings import settings
 from app.core.deps import require_role
+from app.services import config_service
 from app.db.base import get_db
 from app.models.delivery import DeliveryContext
 from app.models.disfluency import Difficulty
@@ -48,11 +49,13 @@ def start_test(
     db.add(test)
     db.flush()  # get test.id
 
-    # 40 random phrases of MIXED difficulty (no difficulty filter), unseen in 15 days.
+    phrase_count = config_service.get_int(
+        "proficiency_test_phrase_count", db, default=settings.proficiency_test_phrase_count
+    )
     phrases = select_unseen_phrases(
         db,
         user_id=current_user.id,
-        count=settings.proficiency_test_phrase_count,
+        count=phrase_count,
     )
     record_deliveries(db, current_user.id, phrases, DeliveryContext.PROFICIENCY_TEST)
 
