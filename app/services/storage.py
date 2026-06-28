@@ -93,12 +93,11 @@ def upload_practice_audio(
 ) -> str:
     """Upload a Repeat-After-Me recording to S3 and return its canonical URL.
 
-    Stored under `voice_recording/repeat_after_me/`, keyed by user so a
-    therapist's dashboard can browse a patient's recordings. A random UUID keeps
-    each attempt's object distinct. The bucket is PRIVATE — serve via
-    `presigned_url(url)`.
+    Stored directly in `voice_recording/repeat_after_me/`, with the user id in the
+    filename (so it's still traceable to a patient) and a random UUID to keep each
+    object distinct. The bucket is PRIVATE — serve via `presigned_url(url)`.
     """
-    key = f"{_PRACTICE_FOLDER}/{user_id}/{uuid.uuid4()}.{ext}"
+    key = f"{_PRACTICE_FOLDER}/{user_id}_{uuid.uuid4()}.{ext}"
     _client().put_object(
         Bucket=settings.s3_bucket_name,
         Key=key,
