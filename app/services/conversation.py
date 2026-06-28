@@ -26,11 +26,16 @@ from app.models.conversation import ConversationHistory
 from app.models.user import User
 from app.services import ai_brain
 from app.services.ml_client import MLServiceError, ml_client
-from app.services.storage import upload_audio
+from app.services.storage import presigned_url, upload_audio
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CHILD_AGE = 10
+
+# How long the stored child-audio link stays directly openable. Presigned URLs
+# expire; 7 days is the maximum AWS SigV4 allows. The API re-signs on every read,
+# so served links never break — only the raw value saved in the DB ages out.
+_STORED_URL_EXPIRY = 7 * 24 * 3600  # 7 days
 
 
 def new_session_id() -> uuid.UUID:
@@ -97,7 +102,6 @@ async def start_session_with_greeting(db: Session, user: User) -> dict[str, Any]
         child_transcript=None,
         child_audio_url=None,
         ai_text=ai_text,
-        ai_audio_url=None,  # AI audio is streamed inline, never stored
         disfluency_events=None,
     )
     db.add(turn)
@@ -135,13 +139,15 @@ async def process_turn(
     """
     turn_number = _next_turn_number(db, session_id)
 
-    # ── 1. Upload child audio to S3 ──────────────────────────────────────────
-    child_audio_url = upload_audio(
+    # ── 1. Upload child audio to S3 (private bucket) ─────────────────────────
+    child_audio_object = upload_audio(
         file_bytes=raw_audio_bytes,
         session_id=str(session_id),
         turn_number=turn_number,
         speaker="child",
     )
+    # Store a presigned (directly-openable) link, valid for up to 7 days.
+    child_audio_url = presigned_url(child_audio_object, expires_in=_STORED_URL_EXPIRY)
 
     # ── 2. Transcribe + text-layer disfluency detection (ML service) ────────
     ml_result = await ml_client.analyse(
@@ -175,9 +181,8 @@ async def process_turn(
         session_id=session_id,
         turn_number=turn_number,
         child_transcript=transcript,
-        child_audio_url=child_audio_url,
+        child_audio_url=child_audio_url,  # presigned, directly openable (7-day)
         ai_text=ai_text,
-        ai_audio_url=None,  # AI audio is streamed inline, never stored
         disfluency_events=disfluencies,
     )
     db.add(turn)
@@ -189,7 +194,7 @@ async def process_turn(
         "session_id": session_id,
         "turn_number": turn_number,
         "child_transcript": transcript,
-        "child_audio_url": child_audio_url,
+        "child_audio_url": child_audio_url,  # same presigned link saved in the DB
         "text": ai_text,
         "audio": ai_audio_base64,
         "disfluency_count": len(disfluencies),
@@ -212,7 +217,7 @@ def get_session_report(db: Session, session_id: uuid.UUID) -> dict[str, Any]:
                 "turn_number": t.turn_number,
                 "child_transcript": t.child_transcript,
                 "ai_text": t.ai_text,
-                "child_audio_url": t.child_audio_url,
+                "child_audio_url": presigned_url(t.child_audio_url) if t.child_audio_url else None,
                 "disfluency_count": len(t.disfluency_events or []),
                 "disfluencies": t.disfluency_events or [],
             }

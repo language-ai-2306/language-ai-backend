@@ -16,6 +16,10 @@ os.environ.setdefault("JWT_SECRET", "test-secret-for-pytest")
 os.environ.setdefault("ML_SERVICE_URL", "http://fake-ml:8081")
 os.environ.setdefault("S3_BUCKET_NAME", "test-bucket")
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-anthropic-key")
+# Fake AWS creds so storage.presigned_url() can sign locally (no network call).
+os.environ.setdefault("AWS_ACCESS_KEY_ID", "test-aws-key")
+os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "test-aws-secret")
+os.environ.setdefault("AWS_REGION", "ap-southeast-2")
 
 import uuid
 from datetime import date
@@ -213,7 +217,6 @@ def make_turn(
         child_transcript=transcript,
         child_audio_url=f"https://s3.example.com/{session_id}/turn_{turn_number}/child.wav",
         ai_text=ai_text,
-        ai_audio_url=f"https://s3.example.com/{session_id}/turn_{turn_number}/ai.wav",
         disfluency_events=disfluency_events or [],
     )
     db.add(turn)

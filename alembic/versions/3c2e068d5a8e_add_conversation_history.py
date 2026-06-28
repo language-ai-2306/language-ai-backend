@@ -25,7 +25,6 @@ def upgrade() -> None:
         sa.Column("child_transcript", sa.Text(), nullable=True),
         sa.Column("child_audio_url", sa.Text(), nullable=True),
         sa.Column("ai_text", sa.Text(), nullable=True),
-        sa.Column("ai_audio_url", sa.Text(), nullable=True),
         sa.Column("disfluency_events", postgresql.JSONB(), nullable=True),
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
         sa.Column("guid", postgresql.UUID(as_uuid=True), nullable=False),

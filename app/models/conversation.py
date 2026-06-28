@@ -36,9 +36,9 @@ class ConversationHistory(AbstractEntity):
     child_transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
     child_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # AI's response.
+    # AI's response. (Only the text is stored — Ollie's audio is synthesised on
+    # the fly and returned inline as base64, never persisted.)
     ai_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    ai_audio_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Raw disfluency events from the ML service, stored as JSON array.
     disfluency_events: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
