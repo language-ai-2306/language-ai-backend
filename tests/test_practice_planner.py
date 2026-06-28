@@ -107,7 +107,28 @@ class TestBuildPracticeSet:
         result = practice_planner.build_practice_set(db, patient_user.id, count=3)
         assert "sh" in result["targeted_sounds"]
         assert all(it["phrase"].target_phoneme == "sh" for it in result["items"])
-        assert all("targets 'sh'" in it["reason"] for it in result["items"])
+        assert all("'sh'" in it["reason"] for it in result["items"])
+
+    def test_warmup_atlevel_stretch_mix(self, db, patient_user, ailment_type):
+        # Child works on 'sh' at MEDIUM; the batch should mix easier/harder tiers.
+        disfluency_tracker.record_occurrences(
+            db, user_id=patient_user.id, disfluencies=[{"type": "block", "word": "shoe"}],
+        )
+        db.add(PracticeSkill(
+            user_id=patient_user.id, target_phoneme="sh", current_difficulty="MEDIUM",
+            attempts=0, consecutive_low=0, mastery_level="practicing",
+        ))
+        db.commit()
+        make_phrase(db, ailment_type, "sh", Difficulty.EASY, n=4)     # warm-up pool
+        make_phrase(db, ailment_type, "sh", Difficulty.MEDIUM, n=4)   # at-level pool
+        make_phrase(db, ailment_type, "sh", Difficulty.HARD, n=4)     # stretch pool
+
+        result = practice_planner.build_practice_set(db, patient_user.id, count=5)
+        diffs = {it["phrase"].difficulty.value for it in result["items"]}
+        assert "MEDIUM" in diffs           # at-level present
+        assert len(diffs) >= 2             # plus a warm-up and/or stretch tier
+        bands = {it["reason"].split(" ")[0] for it in result["items"]}
+        assert "at-level" in bands
 
 
 # ── endpoints ─────────────────────────────────────────────────────────────────

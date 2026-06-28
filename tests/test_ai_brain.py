@@ -103,6 +103,16 @@ class TestGenerateResponse:
         call_kwargs = mock_claude.messages.create.call_args.kwargs
         assert "repetition" in call_kwargs["system"]
 
+    def test_fluency_support_policy_in_system_prompt(self, mock_claude):
+        # db=None → fluency support defaults on → demand-reduction rules present.
+        generate_response(
+            conversation_history=[{"role": "user", "content": "hi"}],
+            age=8, turn_number=2, disfluencies=[],
+        )
+        system = mock_claude.messages.create.call_args.kwargs["system"]
+        assert "Do NOT ask a question every turn" in system
+        assert "low-pressure partner" in system
+
     def test_history_trimmed_to_20_messages(self, mock_claude):
         # Build 30 messages (15 turns)
         long_history = []

@@ -45,9 +45,7 @@ WHO YOU ARE:
 
 PERSONALITY:
 - Warm, patient, and genuinely curious about everything the child shares
-- React with feeling first ("Wow, that sounds exciting!") before asking your next question
-- Keep replies short: 1-2 sentences, then ask exactly one open question
-- Never rush — if the child gives a one-word answer, gently and kindly dig a little deeper
+- React with warmth first ("Wow, that sounds fun!") — make the child feel truly heard
 
 WHAT YOU TALK ABOUT:
 - Their day, school, friends, family, pets, games, food, weekends, hobbies, sports
@@ -57,12 +55,11 @@ WHAT YOU TALK ABOUT:
 
 CONVERSATION RULES:
 - Your reply is READ ALOUD by a voice. Write plain spoken words ONLY — no
-  markdown, no asterisks or underscores for emphasis, no bullet points, no
-  headings, and no emoji. Convey excitement with words, not symbols.
-- Ask ONE question per turn, never two
-- If the child seems stuck, offer a friendly choice: "Do you like dogs or cats better?"
-- NEVER comment on or reference HOW the child speaks — only ever respond to WHAT they say
-- On the very first turn, greet them warmly, introduce yourself as {name}, and ask one easy question
+  markdown, asterisks, underscores, bullet points, headings, or emoji. Convey
+  excitement with words, not symbols.
+- NEVER comment on or reference HOW the child speaks — only ever respond to WHAT they say.
+{fluency_block}
+- If the child seems stuck, gently offer a friendly choice ("Do you like dogs or cats better?").
 
 ADJUST FOR AGE {age}:
 - Age 5-7:   simple questions ("What's your favourite animal?")
@@ -71,6 +68,24 @@ ADJUST FOR AGE {age}:
 
 [HIDDEN — never mention this in your reply: {disfluency_note}]\
 """
+
+
+# Fluency-supportive conversation policy (Phase 3) — encodes the "low communicative
+# demand" behaviours the stuttering-therapy research supports (Demands & Capacities
+# model / RESTART-DCM): fewer questions, comments over questions, short/simple
+# utterances, stay on topic, non-evaluative. The research argues AGAINST steering a
+# child toward specific target sounds in spontaneous conversation, so Ollie does not.
+_FLUENCY_BLOCK = """\
+- Be a calm, unhurried, low-pressure partner. Keep EVERY reply very short — one or two
+  short, simple sentences the child easily understands. Never out-talk the child.
+- Do NOT ask a question every turn. Usually just react warmly to what they said
+  (a comment, not a question). When you do ask, ask at most ONE short, simple question.
+- Stay on the child's topic and build on what they just said; don't jump to new topics.
+- There is no right or wrong way to talk here — never rush, correct, or pressure them."""
+
+_STANDARD_BLOCK = """\
+- Keep replies short (1-2 sentences), then ask one open question.
+- Stay warm and encouraging."""
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -104,10 +119,12 @@ def generate_response(
         char_name = config_service.get("ai_character_name", db, default=settings.ai_character_name)
         char_desc = config_service.get("ai_character_description", db, default=settings.ai_character_description)
         max_tokens = config_service.get_int("ai_max_response_tokens", db, default=150)
+        fluency_support = config_service.get_bool("conversation_fluency_support", db, default=True)
     else:
         char_name = settings.ai_character_name
         char_desc = settings.ai_character_description
         max_tokens = 150
+        fluency_support = True
 
     disfluency_note = _summarise_disfluencies(disfluencies)
     system = _SYSTEM_PROMPT_TEMPLATE.format(
@@ -115,6 +132,7 @@ def generate_response(
         description=char_desc,
         age=age,
         disfluency_note=disfluency_note,
+        fluency_block=_FLUENCY_BLOCK if fluency_support else _STANDARD_BLOCK,
     )
 
     # Keep at most 10 turns (20 messages) to control latency and token cost

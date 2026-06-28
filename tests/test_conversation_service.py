@@ -14,6 +14,20 @@ from app.services import conversation as svc
 from tests.conftest import make_turn
 
 
+# ── age from date of birth ────────────────────────────────────────────────────
+
+class TestGetAge:
+    def test_age_computed_from_dob(self, patient_user):
+        # conftest patient_user has dob date(2012, 6, 15) → a real age, clamped 5–15.
+        age = svc._get_age(patient_user)
+        assert 5 <= age <= 15
+
+    def test_falls_back_without_dob(self):
+        class _NoDob:
+            dob = None
+        assert svc._get_age(_NoDob()) == svc.DEFAULT_CHILD_AGE
+
+
 # ── list_patient_sessions ─────────────────────────────────────────────────────
 
 class TestListPatientSessions:

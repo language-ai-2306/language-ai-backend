@@ -149,7 +149,10 @@ def get_game_phrases(
     responses={403: {"description": "Patient role required"}},
 )
 def get_targeted_phrases(
-    count: int = Query(10, ge=1, le=50, description="How many phrases to return"),
+    count: int | None = Query(
+        None, ge=1, le=50,
+        description="How many phrases to return (defaults to the configured batch size)",
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.PATIENT)),
 ) -> TargetedPhrasesResponse:

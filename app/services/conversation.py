@@ -16,6 +16,7 @@ import logging
 import re
 import uuid
 from collections import defaultdict
+from datetime import date
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -387,5 +388,11 @@ def _load_history(db: Session, session_id: uuid.UUID) -> list[dict]:
 
 
 def _get_age(user: User) -> int:
-    # TODO: read from user.patient_detail.date_of_birth once that field is added
-    return DEFAULT_CHILD_AGE
+    """The child's age from their date of birth, clamped to the 5–15 range the
+    conversation persona is calibrated for. Falls back to a default if no DOB."""
+    dob = getattr(user, "dob", None)
+    if dob is None:
+        return DEFAULT_CHILD_AGE
+    today = date.today()
+    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    return max(5, min(15, age))
