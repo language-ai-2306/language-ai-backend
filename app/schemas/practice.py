@@ -19,6 +19,19 @@ class TargetedPhrasesResponse(BaseModel):
     items: list[TargetedPhraseItem]
 
 
+class NextPhraseResponse(BaseModel):
+    """One phrase to practise, at the chosen difficulty, with its spoken audio."""
+    phrase: PhraseRead
+    reason: str                       # why this phrase (e.g. "targets 'sh' at EASY")
+    audio: str                        # base64 MP3 (audio/mpeg) of the phrase in the AI voice
+
+
+class StartIntroResponse(BaseModel):
+    """The AI's spoken introduction to the Repeat-After-Me game, by name."""
+    text: str                         # the intro Ollie says (personalised with the child's name)
+    audio: str                        # base64 MP3 (audio/mpeg) of the intro in the AI voice
+
+
 # ── Doctor: per-sound mastery matrix ──────────────────────────────────────────
 
 class SkillRow(BaseModel):

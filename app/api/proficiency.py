@@ -9,13 +9,17 @@ Flow:
      results, computes an overall score, and assigns a starting difficulty.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config.settings import settings
 from app.core.deps import require_role
-from app.services import config_service
+from app.services import config_service, disfluency_tracker
+
+logger = logging.getLogger(__name__)
 from app.db.base import get_db
 from app.models.delivery import DeliveryContext
 from app.models.disfluency import Difficulty
@@ -103,4 +107,16 @@ def submit_test(
 
     db.commit()
     db.refresh(test)
+
+    # Feed any per-phrase disfluencies into the unified profile (source="proficiency").
+    # Secondary to returning the result — never let it break the response.
+    events = [d for item in payload.responses for d in (item.disfluencies or [])]
+    if events:
+        try:
+            disfluency_tracker.record_occurrences(
+                db, user_id=current_user.id, disfluencies=events, source="proficiency",
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning("failed to record proficiency disfluencies for test %s", test.id, exc_info=True)
+
     return test

@@ -27,8 +27,17 @@ def _client():
     return _s3
 
 
-# Each speaker's audio goes into its own top-level S3 folder.
-_FOLDER_BY_SPEAKER = {"child": "children_voice", "ai": "AI_voice"}
+# All recordings live under one top-level folder, split by feature:
+#   voice_recording/conversation/...     — conversation (Converse with Ollie)
+#   voice_recording/repeat_after_me/...  — Repeat-After-Me practice
+_CONVERSATION_FOLDER = "voice_recording/conversation"
+_PRACTICE_FOLDER = "voice_recording/repeat_after_me"
+
+
+def _object_url(key: str) -> str:
+    """Full canonical (regional) S3 URL for an object key. The bucket is PRIVATE,
+    so this is not directly accessible — serve it via `presigned_url(url)`."""
+    return f"https://{settings.s3_bucket_name}.s3.{settings.aws_region}.amazonaws.com/{key}"
 
 
 def upload_audio(
@@ -39,35 +48,20 @@ def upload_audio(
     ext: str = "wav",
     content_type: str = "audio/wav",
 ) -> str:
-    """Upload audio bytes to S3 and return the object URL.
+    """Upload a conversation recording to S3 and return its canonical URL.
 
-    The file is stored directly inside one of two folders — `children_voice/`
-    (the child's recording) or `AI_voice/` (Ollie's reply) — named by session
-    and turn so each object is unique and traceable back to its conversation.
-
-    Args:
-        file_bytes:   Raw audio bytes to upload.
-        session_id:   UUID string grouping this conversation session.
-        turn_number:  Which turn this audio belongs to.
-        speaker:      "child" or "ai" — selects the destination folder.
-        ext:          File extension without dot (default "wav").
-        content_type: MIME type for the S3 object (default "audio/wav").
-
-    Returns:
-        The object's full canonical S3 URL (e.g.
-        "https://<bucket>.s3.<region>.amazonaws.com/children_voice/<sid>_turn_2.wav").
-        The bucket is PRIVATE, so this URL is not directly accessible — serve the
-        file via `presigned_url(url)`, which signs it for temporary access.
+    Stored under `voice_recording/conversation/`, named by session, turn and
+    speaker so each object is unique and traceable back to its conversation.
+    The bucket is PRIVATE — serve the file via `presigned_url(url)`.
     """
-    folder = _FOLDER_BY_SPEAKER.get(speaker, speaker)
-    key = f"{folder}/{session_id}_turn_{turn_number}.{ext}"
+    key = f"{_CONVERSATION_FOLDER}/{session_id}_turn_{turn_number}_{speaker}.{ext}"
     _client().put_object(
         Bucket=settings.s3_bucket_name,
         Key=key,
         Body=file_bytes,
         ContentType=content_type,
     )
-    return f"https://{settings.s3_bucket_name}.s3.{settings.aws_region}.amazonaws.com/{key}"
+    return _object_url(key)
 
 
 def presigned_url(key_or_url: str, expires_in: int = 3600) -> str:
@@ -97,27 +91,29 @@ def upload_practice_audio(
     ext: str = "wav",
     content_type: str = "audio/wav",
 ) -> str:
-    """Upload a Repeat-After-Me recording to S3 and return the object URL.
+    """Upload a Repeat-After-Me recording to S3 and return its canonical URL.
 
-    Keyed by user so a therapist's dashboard can browse a patient's recordings.
-    A random UUID keeps each attempt's object distinct.
+    Stored under `voice_recording/repeat_after_me/`, keyed by user so a
+    therapist's dashboard can browse a patient's recordings. A random UUID keeps
+    each attempt's object distinct. The bucket is PRIVATE — serve via
+    `presigned_url(url)`.
     """
-    key = f"practice/{user_id}/{uuid.uuid4()}.{ext}"
+    key = f"{_PRACTICE_FOLDER}/{user_id}/{uuid.uuid4()}.{ext}"
     _client().put_object(
         Bucket=settings.s3_bucket_name,
         Key=key,
         Body=file_bytes,
         ContentType=content_type,
     )
-    return f"https://{settings.s3_bucket_name}.s3.amazonaws.com/{key}"
+    return _object_url(key)
 
 
 def delete_audio(url: str) -> None:
     """Delete an object given its S3 URL. Silently ignores missing objects."""
     if not url:
         return
-    # Extract key from https://<bucket>.s3.amazonaws.com/<key>
-    key = url.split(".amazonaws.com/", 1)[-1]
+    # Extract key from the URL, dropping any presigned query string.
+    key = url.split(".amazonaws.com/", 1)[-1].split("?", 1)[0]
     try:
         _client().delete_object(Bucket=settings.s3_bucket_name, Key=key)
     except ClientError:

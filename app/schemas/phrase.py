@@ -27,3 +27,4 @@ class PhraseRead(BaseModel):
     # The ORM column is `ailment_type_id`; expose it as `ailment_id` in the API.
     ailment_id: int = Field(validation_alias="ailment_type_id")
     difficulty: Difficulty
+    target_phoneme: Optional[str] = None

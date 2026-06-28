@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import admin, audio, auth, conversation, phrases, proficiency, users
+from app.api import admin, audio, auth, conversation, phrases, proficiency, repeat_after_me, users
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -121,6 +121,7 @@ app = FastAPI(
 
 app.include_router(admin.router)
 app.include_router(audio.router)
+app.include_router(repeat_after_me.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(phrases.router)

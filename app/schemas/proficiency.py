@@ -21,6 +21,9 @@ class ProficiencyResponseItem(BaseModel):
     phrase_id: int
     score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     is_correct: Optional[bool] = None
+    # Detected disfluency events for this phrase, if the client analysed the
+    # recording. When present they feed the child's unified disfluency profile.
+    disfluencies: Optional[List[dict]] = None
 
 
 class ProficiencySubmit(BaseModel):

@@ -194,6 +194,56 @@ def _pick_any(db: Session, sound: str, difficulty: str, exclude: set[int]) -> Di
     return None
 
 
+def _pick_at_difficulty(db: Session, difficulty: str, exclude: set[int]) -> DisfluencyPhrase | None:
+    q = (
+        select(DisfluencyPhrase)
+        .where(DisfluencyPhrase.difficulty == Difficulty(difficulty))
+        .order_by(func.random())
+        .limit(1)
+    )
+    if exclude:
+        q = q.where(DisfluencyPhrase.id.not_in(exclude))
+    return db.scalar(q)
+
+
+def next_phrase(db: Session, user_id: int, difficulty) -> dict[str, Any] | None:
+    """Pick ONE phrase at the chosen difficulty for the game.
+
+    Within that difficulty, prefer a phrase targeting one of the child's problem
+    sounds (from their disfluency profile / history); otherwise serve a random
+    unseen phrase. Records the delivery for cooldown. Returns None only if the
+    library has no phrases at that difficulty at all.
+    """
+    difficulty = difficulty.value if hasattr(difficulty, "value") else str(difficulty)
+    recently = _recently_shown_ids(db, user_id)
+
+    profile = disfluency_tracker.get_disfluency_profile(db, user_id)
+    target_sounds = [b["value"] for b in profile["by_sound"]][:MAX_TARGET_SOUNDS]
+
+    phrase: DisfluencyPhrase | None = None
+    reason = ""
+    # 1. Targeted: a problem-sound phrase at this difficulty the child hasn't seen.
+    for sound in target_sounds:
+        phrase = _pick(db, sound, difficulty, recently)
+        if phrase is not None:
+            reason = f"targets '{sound}' at {difficulty}"
+            break
+    # 2. Any unseen phrase at this difficulty.
+    if phrase is None:
+        phrase = _pick_at_difficulty(db, difficulty, recently)
+        reason = f"{difficulty} practice"
+    # 3. Last resort: ignore cooldown so the game never dead-ends.
+    if phrase is None:
+        phrase = _pick_at_difficulty(db, difficulty, set())
+        reason = f"{difficulty} practice (revisit)"
+    if phrase is None:
+        return None
+
+    record_deliveries(db, user_id, [phrase], DeliveryContext.GAME)
+    db.commit()
+    return {"phrase": phrase, "reason": reason}
+
+
 def build_practice_set(db: Session, user_id: int, count: int | None = None) -> dict[str, Any]:
     """Return a personalised batch (phrase + reason) with a warm-up/at-level/stretch
     difficulty mix, and record delivery for cooldown."""

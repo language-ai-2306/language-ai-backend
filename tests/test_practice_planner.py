@@ -1,5 +1,8 @@
 """Tests for Phase 2 — adaptive targeted practice (planner + feedback loop)."""
 
+import io
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from tests.conftest import auth
@@ -156,3 +159,84 @@ class TestEndpoints:
     def test_practice_skill_patient_403(self, client, patient_user, patient_token):
         r = client.get(f"/v1/audio/patients/{patient_user.id}/practice-skill", headers=auth(patient_token))
         assert r.status_code == 403
+
+
+class TestNextPhrase:
+    @pytest.fixture(autouse=True)
+    def mock_tts(self):
+        with patch("app.api.repeat_after_me.ml_client.synthesise", new_callable=AsyncMock, return_value=b"FAKEAUDIO"):
+            yield
+
+    def test_returns_phrase_at_difficulty_with_audio(self, client, db, patient_user, patient_token, ailment_type):
+        make_phrase(db, ailment_type, "s", Difficulty.EASY, n=3)
+        make_phrase(db, ailment_type, "s", Difficulty.HARD, n=3)
+        r = client.get("/v1/repeat-after-me/next-phrase?difficulty=EASY", headers=auth(patient_token))
+        assert r.status_code == 200
+        body = r.json()
+        assert body["phrase"]["difficulty"] == "EASY"   # respects the chosen difficulty
+        assert body["audio"]                            # base64 audio present
+
+    def test_prefers_profile_sound(self, client, db, patient_user, patient_token, ailment_type):
+        disfluency_tracker.record_occurrences(
+            db, user_id=patient_user.id, disfluencies=[{"type": "block", "word": "shoe"}],
+        )
+        make_phrase(db, ailment_type, "sh", Difficulty.EASY, n=3)
+        make_phrase(db, ailment_type, "s", Difficulty.EASY, n=3)
+        r = client.get("/v1/repeat-after-me/next-phrase?difficulty=EASY", headers=auth(patient_token))
+        assert r.status_code == 200
+        assert r.json()["phrase"]["target_phoneme"] == "sh"
+        assert "'sh'" in r.json()["reason"]
+
+    def test_doctor_403(self, client, doctor_token):
+        assert client.get("/v1/repeat-after-me/next-phrase?difficulty=EASY", headers=auth(doctor_token)).status_code == 403
+
+
+class TestStart:
+    @pytest.fixture(autouse=True)
+    def mock_tts(self):
+        with patch("app.api.repeat_after_me.ml_client.synthesise", new_callable=AsyncMock, return_value=b"FAKEAUDIO"):
+            yield
+
+    def test_intro_greets_by_name_with_audio(self, client, patient_user, patient_token):
+        r = client.get("/v1/repeat-after-me/start", headers=auth(patient_token))
+        assert r.status_code == 200
+        body = r.json()
+        assert patient_user.first_name in body["text"]   # personalised greeting
+        assert body["audio"]                             # spoken audio present
+
+    def test_doctor_403(self, client, doctor_token):
+        assert client.get("/v1/repeat-after-me/start", headers=auth(doctor_token)).status_code == 403
+
+
+class TestAttempt:
+    @pytest.fixture(autouse=True)
+    def mock_io(self):
+        fake_result = {
+            "reference_phrase": "she sells shells",
+            "transcript": "she sells shells",
+            "disfluencies": [{"type": "block", "word": "shoe", "severity": "severe"}],
+            "recognition": {"dominant_disfluency": "block"},
+            "scores": {"fluency_score": 0.8, "stutter_frequency_percent": 2.0},
+            "should_retry": False,
+        }
+        with patch("app.api.repeat_after_me._analyse_recording",
+                   new_callable=AsyncMock, return_value=(fake_result, b"WAV")), \
+             patch("app.api.repeat_after_me.storage.upload_practice_audio", return_value="https://s3/x.wav"), \
+             patch("app.api.repeat_after_me.storage.presigned_url", return_value="https://s3/x.wav?sig"):
+            yield
+
+    def test_attempt_takes_text_age_from_dob_and_links_phrase(
+        self, client, db, patient_user, patient_token, ailment_type
+    ):
+        from app.models.practice_attempt import PracticeAttempt
+        phrase = make_phrase(db, ailment_type, "sh", Difficulty.EASY)   # sentence "sh EASY 0"
+        r = client.post(
+            "/v1/repeat-after-me/attempt",
+            data={"text": phrase.sentence},                            # text, not phrase_id
+            files={"audio": ("a.wav", io.BytesIO(b"x"), "audio/wav")},
+            headers=auth(patient_token),
+        )
+        assert r.status_code == 201
+        assert r.json()["phrase_id"] == phrase.id                      # linked via text match
+        att = db.query(PracticeAttempt).filter_by(user_id=patient_user.id).one()
+        assert 5 <= att.child_age <= 15                                # age came from DOB, not the request
