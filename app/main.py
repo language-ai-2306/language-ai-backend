@@ -3,7 +3,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import admin, audio, auth, conversation, phrases, proficiency, repeat_after_me, users
+from app.api import (
+    admin,
+    audio,
+    auth,
+    conversation,
+    doctors,
+    patients,
+    phrases,
+    proficiency,
+    repeat_after_me,
+    users,
+)
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -51,6 +62,16 @@ TAGS_METADATA = [
         "description": "Runtime configuration management. **Doctor role required.** "
                        "Read and update business rules (phrase cooldown days, test size, etc.) "
                        "without a code deploy.",
+    },
+    {
+        "name": "doctors",
+        "description": "Doctor directory and a patient's request to be linked to a doctor. "
+                       "Requesting a doctor creates a **pending** request that the doctor must approve.",
+    },
+    {
+        "name": "patients",
+        "description": "Doctor-facing patient management: list **pending** link requests, "
+                       "approve/reject them, and list **approved** patients.",
     },
 ]
 
@@ -128,6 +149,8 @@ app.include_router(phrases.router)
 app.include_router(phrases.game_router)
 app.include_router(proficiency.router)
 app.include_router(conversation.router)
+app.include_router(doctors.router)
+app.include_router(patients.router)
 
 
 @app.get("/health", tags=["health"], summary="Health check")

@@ -21,6 +21,9 @@ class PatientSignup(UserBase):
     nickname: str = Field(min_length=1, max_length=100)
     avatar_id: Optional[int] = None
     ailment_ids: List[int] = Field(default_factory=list)
+    # Optional: request a doctor during signup. Creates a PENDING link request
+    # (the doctor must still approve). Invalid doctor_id → 404, signup rolls back.
+    doctor_id: Optional[int] = None
 
 
 class DoctorSignup(UserBase):

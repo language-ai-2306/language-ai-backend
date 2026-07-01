@@ -10,6 +10,7 @@ from app.models.doctor import Doctor
 from app.models.patient import PatientDetail
 from app.models.user import User, UserRole
 from app.schemas.auth import DoctorSignup, PatientSignup, SignupPayload, Token
+from app.services import care_team
 
 
 def ensure_email_free(db: Session, email: str) -> None:
@@ -47,6 +48,13 @@ def signup(db: Session, payload: SignupPayload) -> User:
                 db.scalars(select(Ailment).where(Ailment.id.in_(payload.ailment_ids))).all()
             )
         db.add(patient)
+
+        # Optional: request a doctor during signup. commit=False so the account
+        # and the request commit together; an invalid doctor_id raises 404 and
+        # the whole signup rolls back.
+        if payload.doctor_id is not None:
+            db.flush()  # assign patient.id before creating the request
+            care_team.create_request(db, patient, payload.doctor_id, commit=False)
     else:
         assert isinstance(payload, DoctorSignup)
         db.add(Doctor(

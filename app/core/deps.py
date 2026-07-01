@@ -12,10 +12,13 @@ patient or a doctor — use it to protect role-specific endpoints.
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
 from app.db.base import get_db
+from app.models.doctor import Doctor
+from app.models.patient import PatientDetail
 from app.models.user import User, UserRole
 
 # tokenUrl points at the login endpoint; it tells the interactive API docs
@@ -55,3 +58,35 @@ def require_role(*allowed_roles: UserRole):
         return current_user
 
     return _checker
+
+
+def get_current_doctor(
+    current_user: User = Depends(require_role(UserRole.DOCTOR)),
+    db: Session = Depends(get_db),
+) -> Doctor:
+    """Resolve the Doctor profile row for the logged-in doctor.
+
+    `require_role` already guarantees the DOCTOR role (403 otherwise); this loads
+    the matching `doctor_details` row so handlers get the Doctor directly.
+    """
+    doctor = db.scalar(select(Doctor).where(Doctor.user_id == current_user.id))
+    if doctor is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Doctor profile not found",
+        )
+    return doctor
+
+
+def get_current_patient(
+    current_user: User = Depends(require_role(UserRole.PATIENT)),
+    db: Session = Depends(get_db),
+) -> PatientDetail:
+    """Resolve the PatientDetail row for the logged-in patient (403 if not a patient)."""
+    patient = db.scalar(select(PatientDetail).where(PatientDetail.user_id == current_user.id))
+    if patient is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Patient profile not found",
+        )
+    return patient

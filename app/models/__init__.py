@@ -16,6 +16,7 @@ from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.models.disfluency_occurrence import DisfluencyOccurrence
 from app.models.doctor import Doctor
 from app.models.patient import PatientDetail, patient_ailment
+from app.models.patient_doctor_request import PatientDoctorRequest, RequestStatus
 from app.models.practice_attempt import PracticeAttempt
 from app.models.practice_skill import PracticeSkill
 from app.models.proficiency import ProficiencyTest, ProficiencyTestResponse
@@ -35,6 +36,8 @@ __all__ = [
     "Doctor",
     "PatientDetail",
     "patient_ailment",
+    "PatientDoctorRequest",
+    "RequestStatus",
     "PracticeAttempt",
     "PracticeSkill",
     "PhraseDelivery",
