@@ -141,6 +141,12 @@ class PatientDashboardResponse(BaseModel):
     # Aggregated across ALL of the patient's active plans.
     today: List[MyPlanItem] = Field(default_factory=list)       # due-today items
     weekly: List[DashboardWeekItem] = Field(default_factory=list)
+    # Summary counts (occurrences). "today" = scheduled today; "weekly" = scheduled
+    # this week. pending is derivable as total − completed.
+    totalTasksToday: int = 0
+    completedTasksToday: int = 0
+    totalTasksWeekly: int = 0
+    completedTasksWeekly: int = 0
 
 
 # --- doctor: progress review --------------------------------------------------

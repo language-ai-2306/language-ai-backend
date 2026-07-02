@@ -438,6 +438,7 @@ def get_dashboard(db: Session, patient: PatientDetail) -> dict[str, Any]:
 
     today_items: list[dict[str, Any]] = []
     week_items: list[dict[str, Any]] = []
+    total_today = completed_today = total_weekly = completed_weekly = 0
     for plan in _active_plans(db, patient):
         for item in plan.items:
             if item.status != PlanItemStatus.ACTIVE:
@@ -448,9 +449,24 @@ def get_dashboard(db: Session, patient: PatientDetail) -> dict[str, Any]:
             if not scheduled_dates:
                 continue
 
-            # Done for the week? (all of this week's scheduled occurrences completed)
-            # → drop the item from the dashboard entirely.
-            if _completed_count(db, item.id, week_dates) >= len(scheduled_dates):
+            # Weekly tally: total vs completed occurrences this week (completed
+            # capped so extra sessions never over-count).
+            sched_week = len(scheduled_dates)
+            done_week = min(_completed_count(db, item.id, week_dates), sched_week)
+            total_weekly += sched_week
+            completed_weekly += done_week
+
+            # Today tally: is today's occurrence done?
+            scheduled_today = _scheduled_today(item.frequency, item.schedule, today)
+            today_sess = _today_session(db, item.id, today) if scheduled_today else None
+            today_done = today_sess is not None and today_sess.status == PlanItemSessionStatus.COMPLETED
+            if scheduled_today:
+                total_today += 1
+                if today_done:
+                    completed_today += 1
+
+            # Done for the week → drop the item from the visible lists.
+            if done_week >= sched_week:
                 continue
 
             base = {
@@ -468,18 +484,23 @@ def get_dashboard(db: Session, patient: PatientDetail) -> dict[str, Any]:
             )
 
             # Today's to-do: scheduled today AND today's occurrence not yet completed.
-            if _scheduled_today(item.frequency, item.schedule, today):
-                session = _today_session(db, item.id, today)
-                if session is None or session.status != PlanItemSessionStatus.COMPLETED:
-                    attempts_today, due = _today_progress(session)
-                    today_items.append(
-                        {
-                            **base,
-                            "dosage": item.dosage,
-                            "status": item.status,
-                            "attempts_today": attempts_today,
-                            "due": due,
-                        }
-                    )
+            if scheduled_today and not today_done:
+                attempts_today, due = _today_progress(today_sess)
+                today_items.append(
+                    {
+                        **base,
+                        "dosage": item.dosage,
+                        "status": item.status,
+                        "attempts_today": attempts_today,
+                        "due": due,
+                    }
+                )
 
-    return {"today": today_items, "weekly": week_items}
+    return {
+        "today": today_items,
+        "weekly": week_items,
+        "totalTasksToday": total_today,
+        "completedTasksToday": completed_today,
+        "totalTasksWeekly": total_weekly,
+        "completedTasksWeekly": completed_weekly,
+    }
