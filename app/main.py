@@ -9,10 +9,10 @@ from app.api import (
     auth,
     conversation,
     doctors,
+    exercises,
     patients,
     phrases,
     proficiency,
-    repeat_after_me,
     users,
 )
 from app.config.settings import settings
@@ -72,6 +72,12 @@ TAGS_METADATA = [
         "name": "patients",
         "description": "Doctor-facing patient management: list **pending** link requests, "
                        "approve/reject them, and list **approved** patients.",
+    },
+    {
+        "name": "exercises",
+        "description": "Unified practice-game API. `{game}` = read-it-loud, picture-talk, "
+                       "story-teller, or repeat-after-me. Each game: **start** (spoken intro), "
+                       "**content** (next prompt + audio), **attempt** (analyse a recording).",
     },
 ]
 
@@ -142,7 +148,6 @@ app = FastAPI(
 
 app.include_router(admin.router)
 app.include_router(audio.router)
-app.include_router(repeat_after_me.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(phrases.router)
@@ -151,6 +156,8 @@ app.include_router(proficiency.router)
 app.include_router(conversation.router)
 app.include_router(doctors.router)
 app.include_router(patients.router)
+app.include_router(exercises.router)
+# Legacy /v1/repeat-after-me/* routes removed — served by /v1/exercises/repeat-after-me/*.
 
 
 @app.get("/health", tags=["health"], summary="Health check")

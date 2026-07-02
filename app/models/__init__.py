@@ -14,6 +14,7 @@ from app.models.avatar import Avatar
 from app.models.delivery import DeliveryContext, PhraseDelivery
 from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.models.disfluency_occurrence import DisfluencyOccurrence
+from app.models.exercise import ExerciseType
 from app.models.doctor import Doctor
 from app.models.patient import PatientDetail, patient_ailment
 from app.models.patient_doctor_request import PatientDoctorRequest, RequestStatus
@@ -31,6 +32,7 @@ __all__ = [
     "Difficulty",
     "DisfluencyPhrase",
     "DisfluencyOccurrence",
+    "ExerciseType",
     "User",
     "UserRole",
     "Doctor",

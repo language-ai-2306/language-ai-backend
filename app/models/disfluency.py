@@ -35,6 +35,21 @@ class DisfluencyPhrase(AbstractEntity):
 
     target_phoneme: Mapped[str | None] = mapped_column(String(10), nullable=True)
 
+    # Which game this content belongs to (REPEAT_AFTER_ME / READ_IT_LOUD /
+    # PICTURE_TALK / STORY_TELLER). Plain string — like DisfluencyOccurrence.source
+    # — so adding a game never needs an enum migration. Existing rows backfill to
+    # REPEAT_AFTER_ME via the server_default.
+    exercise_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        server_default="REPEAT_AFTER_ME",
+        index=True,
+    )
+
+    # Picture Talk only: the image the child describes. NULL for every other game
+    # (for those, `sentence` holds the phrase / passage / story / prompt text).
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     difficulty: Mapped[Difficulty] = mapped_column(
         SAEnum(Difficulty, name="difficulty_enum"),
         nullable=False,
