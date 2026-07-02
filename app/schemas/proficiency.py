@@ -1,5 +1,6 @@
-"""Schemas for the proficiency test flow (start -> submit -> result)."""
+"""Schemas for the proficiency test flow (start -> submit -> result). Ids are GUIDs."""
 
+import uuid
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -9,16 +10,16 @@ from app.schemas.phrase import PhraseRead
 
 
 class ProficiencyStartResponse(BaseModel):
-    """Returned when a patient starts the test: the test id + the phrases to read."""
+    """Returned when a patient starts the test: the test GUID + the phrases to read."""
 
-    test_id: int
+    test_id: uuid.UUID
     phrases: List[PhraseRead]
 
 
 class ProficiencyResponseItem(BaseModel):
     """The patient's result on a single phrase of the test."""
 
-    phrase_id: int
+    phrase_id: uuid.UUID  # phrase GUID
     score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     is_correct: Optional[bool] = None
     # Detected disfluency events for this phrase, if the client analysed the
@@ -33,9 +34,9 @@ class ProficiencySubmit(BaseModel):
 
 
 class ProficiencyResult(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    test_id: int = Field(validation_alias="id")
+    test_id: uuid.UUID = Field(validation_alias="guid")
     score: Optional[float]
     assigned_difficulty: Optional[Difficulty]
     is_completed: bool

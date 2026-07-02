@@ -1,5 +1,6 @@
 """Schemas for disfluency phrases (the practice sentences)."""
 
+import uuid
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,7 +23,7 @@ class PhraseUpdate(BaseModel):
 class PhraseRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: int
+    id: uuid.UUID = Field(validation_alias="guid")  # public id is the GUID
     sentence: str
     # The ORM column is `ailment_type_id`; expose it as `ailment_id` in the API.
     ailment_id: int = Field(validation_alias="ailment_type_id")

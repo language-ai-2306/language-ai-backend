@@ -20,7 +20,7 @@ class DisfluencyEventOut(BaseModel):
 
 
 class TurnResponse(BaseModel):
-    turn_id: int
+    turn_id: UUID
     session_id: UUID
     turn_number: int
     child_transcript: str
@@ -88,7 +88,7 @@ class ProgressPoint(BaseModel):
 
 
 class PatientProgressResponse(BaseModel):
-    user_id: int
+    user_id: UUID          # patient's user GUID
     sessions_analysed: int
     trend: list[ProgressPoint]  # oldest first
 
@@ -103,7 +103,7 @@ class ProfileBucket(BaseModel):
 
 
 class DisfluencyProfileResponse(BaseModel):
-    user_id: int
+    user_id: UUID          # patient's user GUID
     window_days: int
     total_occurrences: int
     last_seen: datetime | None

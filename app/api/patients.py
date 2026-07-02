@@ -57,7 +57,7 @@ def respond_to_request(
     else:
         req = care_team.reject_request(db, doctor, payload.request_id)
     return RequestActionResponse(
-        request_id=req.id, status=req.status.value, responded_at=req.responded_at
+        request_id=req.guid, status=req.status.value, responded_at=req.responded_at
     )
 
 

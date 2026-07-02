@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.analysis.audio_utils import preprocess_audio, validate_audio
 from app.core.deps import get_current_user, require_role
+from app.core.guid import get_by_guid
 from app.db.base import get_db
 from app.models.user import User, UserRole
 from app.schemas.conversation import (
@@ -218,7 +219,7 @@ def get_session_report(
     responses={403: {"description": "Doctor role required"}},
 )
 def get_patient_progress(
-    user_id: int,
+    user_id: uuid.UUID,
     limit: int = 20,
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.DOCTOR)),
@@ -228,7 +229,11 @@ def get_patient_progress(
     a breakdown by type. Use `limit` to control how many past sessions to include
     (default 20). Suitable for plotting an improvement chart.
     """
-    result = conv_service.get_patient_progress(db, user_id, limit=limit)
+    patient = get_by_guid(db, User, user_id)
+    if patient is None:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    result = conv_service.get_patient_progress(db, patient.id, limit=limit)
+    result["user_id"] = patient.guid
     return PatientProgressResponse(**result)
 
 
@@ -241,7 +246,7 @@ def get_patient_progress(
     responses={403: {"description": "Doctor role required"}},
 )
 def get_patient_disfluency_profile(
-    user_id: int,
+    user_id: uuid.UUID,
     window_days: int = 90,
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.DOCTOR)),
@@ -252,7 +257,11 @@ def get_patient_disfluency_profile(
     **words** they struggle with most (severity-weighted). The `by_sound` list
     is what drives targeted Repeat-After-Me phrase selection.
     """
-    result = disfluency_tracker.get_disfluency_profile(db, user_id, window_days=window_days)
+    patient = get_by_guid(db, User, user_id)
+    if patient is None:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    result = disfluency_tracker.get_disfluency_profile(db, patient.id, window_days=window_days)
+    result["user_id"] = patient.guid
     return DisfluencyProfileResponse(**result)
 
 

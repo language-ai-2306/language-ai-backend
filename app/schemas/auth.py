@@ -8,6 +8,7 @@ Single signup schema using a discriminated union on `role`:
 Both branches share the common account fields from UserBase.
 """
 
+import uuid
 from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -21,9 +22,9 @@ class PatientSignup(UserBase):
     nickname: str = Field(min_length=1, max_length=100)
     avatar_id: Optional[int] = None
     ailment_ids: List[int] = Field(default_factory=list)
-    # Optional: request a doctor during signup. Creates a PENDING link request
-    # (the doctor must still approve). Invalid doctor_id → 404, signup rolls back.
-    doctor_id: Optional[int] = None
+    # Optional: request a doctor during signup (doctor's user GUID). Creates a PENDING
+    # link request (the doctor must still approve). Invalid guid → 404, signup rolls back.
+    doctor_id: Optional[uuid.UUID] = None
 
 
 class DoctorSignup(UserBase):

@@ -1,5 +1,6 @@
-"""Phrase routes — thin controller, delegates to PhraseService."""
+"""Phrase routes — thin controller, delegates to PhraseService. Phrase id is a GUID."""
 
+import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
@@ -65,7 +66,7 @@ def list_phrases(
     responses={404: {"description": "Phrase not found"}},
 )
 def get_phrase(
-    phrase_id: int,
+    phrase_id: uuid.UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> DisfluencyPhrase:
@@ -84,7 +85,7 @@ def get_phrase(
     },
 )
 def update_phrase(
-    phrase_id: int,
+    phrase_id: uuid.UUID,
     payload: PhraseUpdate,
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.DOCTOR)),
@@ -103,7 +104,7 @@ def update_phrase(
     },
 )
 def delete_phrase(
-    phrase_id: int,
+    phrase_id: uuid.UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.DOCTOR)),
 ) -> None:
@@ -164,4 +165,5 @@ def get_targeted_phrases(
     set. Each phrase comes with a short reason it was chosen.
     """
     result = practice_planner.build_practice_set(db, current_user.id, count=count)
+    result["user_id"] = current_user.guid  # expose the patient's GUID, not internal id
     return TargetedPhrasesResponse(**result)

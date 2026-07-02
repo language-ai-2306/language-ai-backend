@@ -1,5 +1,6 @@
 """Schemas for Phase 2 targeted practice."""
 
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -13,7 +14,7 @@ class TargetedPhraseItem(BaseModel):
 
 
 class TargetedPhrasesResponse(BaseModel):
-    user_id: int
+    user_id: uuid.UUID                # patient's user GUID
     targeted_sounds: list[str]        # the problem sounds this batch aims at (empty = cold start)
     count: int
     items: list[TargetedPhraseItem]
@@ -44,5 +45,5 @@ class SkillRow(BaseModel):
 
 
 class PracticeSkillResponse(BaseModel):
-    user_id: int
+    user_id: uuid.UUID                # patient's user GUID
     sounds: list[SkillRow]            # worst (highest %SS) first

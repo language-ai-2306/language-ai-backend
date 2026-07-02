@@ -1,5 +1,6 @@
-"""User routes — thin controller, delegates to UserService."""
+"""User routes — thin controller, delegates to UserService. Ids are GUIDs."""
 
+import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, status
@@ -38,7 +39,7 @@ def list_users(
     responses={404: {"description": "User not found"}},
 )
 def get_user(
-    user_id: int,
+    user_id: uuid.UUID,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> User:
@@ -57,7 +58,7 @@ def get_user(
     },
 )
 def update_user(
-    user_id: int,
+    user_id: uuid.UUID,
     payload: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -82,7 +83,7 @@ def update_user(
     },
 )
 def delete_user(
-    user_id: int,
+    user_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:

@@ -1,4 +1,9 @@
-"""Doctor directory + patient's request-a-doctor routes (patient-facing)."""
+"""Doctor directory + patient's request-a-doctor routes (patient-facing).
+
+`doctor_id` (path) and all response ids are GUIDs.
+"""
+
+import uuid
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -40,10 +45,11 @@ def list_doctors(
     },
 )
 def request_doctor(
-    doctor_id: int,
+    doctor_id: uuid.UUID,
     db: Session = Depends(get_db),
     patient: PatientDetail = Depends(get_current_patient),
 ) -> RequestCreateResponse:
     """Send a link request to a doctor. Stays PENDING until the doctor approves."""
     req = care_team.create_request(db, patient, doctor_id)
-    return RequestCreateResponse(request_id=req.id, doctor_id=req.doctor_id, status=req.status.value)
+    # doctor_id echoes the requested doctor GUID; request_id is the request's GUID.
+    return RequestCreateResponse(request_id=req.guid, doctor_id=doctor_id, status=req.status.value)

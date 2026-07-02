@@ -76,11 +76,12 @@ async def start(
 async def next_content(
     game: str = _GAME_PATH,
     difficulty: Difficulty = Query(..., description="EASY, MEDIUM, HARD or TONGUE_TWISTER"),
+    target_phoneme: str | None = Query(default=None, description="Plan-driven: only serve this onset sound (RAM / Read It Loud)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.PATIENT)),
 ) -> ExerciseContentResponse:
     strategy = get_strategy(game)
-    dto = strategy.next_content(db, current_user, difficulty)
+    dto = strategy.next_content(db, current_user, difficulty, target_phoneme)
     if dto is None:
         raise HTTPException(status_code=404, detail="No content available at that difficulty")
     audio = await _synthesise(dto.tts_text) if dto.tts_text else None
@@ -106,6 +107,7 @@ async def submit_attempt(
     game: str = _GAME_PATH,
     audio: UploadFile = File(..., description="The patient's recording (WAV/M4A)"),
     content_id: str = Form(..., description="The content_id returned by /content"),
+    plan_item_id: str | None = Form(default=None, description="Plan item GUID — if practising a plan item, log the attempt to it"),
     use_mock: bool = Form(default=False),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.PATIENT)),
@@ -113,4 +115,14 @@ async def submit_attempt(
     strategy = get_strategy(game)
     content = await audio.read()
     result = await strategy.submit(db, current_user, content_id, content, audio.filename, use_mock)
+
+    # If this attempt is part of a plan, log it + run advancement. Never let a plan
+    # bookkeeping error swallow the child's scored result.
+    if plan_item_id is not None:
+        try:
+            from app.services import plan_progress
+            plan_progress.record_attempt(db, current_user, plan_item_id, result)
+        except Exception:  # noqa: BLE001
+            logger.warning("plan attempt logging failed for plan_item_id=%s", plan_item_id, exc_info=True)
+
     return ExerciseAttemptResponse(**result)

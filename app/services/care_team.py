@@ -1,11 +1,9 @@
 """Care-team service — patient↔doctor linking (request / approve / reject).
 
-The confirmed link lives on `PatientDetail.doctor_id` (unchanged). This service
-manages the PENDING→APPROVED/REJECTED workflow in `patient_doctor_request` and,
-on approval, sets that column in the same transaction.
-
-Functions take a `db: Session` and raise HTTPException on rule violations, so the
-routers stay thin.
+Every person is referenced by their `user.id`. `patient_doctor_request.patient_id`
+and `.doctor_id`, and the confirmed link `PatientDetail.doctor_id`, are all user ids.
+`doctor` args below are Doctor (doctor_details) rows resolved by `get_current_doctor`;
+we compare against `doctor.user_id`.
 """
 
 from datetime import datetime, timezone
@@ -15,10 +13,11 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.guid import get_by_guid
 from app.models.doctor import Doctor
 from app.models.patient import PatientDetail
 from app.models.patient_doctor_request import PatientDoctorRequest, RequestStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 
 
 def _now() -> datetime:
@@ -26,7 +25,6 @@ def _now() -> datetime:
 
 
 def _clamp_page(page: int, size: int) -> tuple[int, int, int]:
-    """Return (page, size, offset) with sane bounds (size capped at 50)."""
     page = max(page, 1)
     size = min(max(size, 1), 50)
     return page, size, (page - 1) * size
@@ -50,7 +48,7 @@ def list_doctors(db: Session, page: int = 1, size: int = 10) -> dict[str, Any]:
     ).all()
     items = [
         {
-            "doctor_id": d.id,
+            "doctor_id": u.guid,  # user GUID of the doctor
             "first_name": u.first_name,
             "last_name": u.last_name,
             "qualification": d.qualification,
@@ -66,7 +64,7 @@ def list_doctors(db: Session, page: int = 1, size: int = 10) -> dict[str, Any]:
 def create_request(
     db: Session,
     patient_detail: PatientDetail,
-    doctor_id: int,
+    doctor_guid,  # the doctor's user GUID
     *,
     commit: bool = True,
 ) -> PatientDoctorRequest:
@@ -75,28 +73,31 @@ def create_request(
     commit=True for the standalone endpoint; commit=False when called inside
     /auth/signup so the account + request share one transaction.
     """
-    if db.get(Doctor, doctor_id) is None:
+    patient_user_id = patient_detail.user_id
+
+    doctor_user = get_by_guid(db, User, doctor_guid)
+    if doctor_user is None or doctor_user.role != UserRole.DOCTOR:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Doctor not found")
+    doctor_id = doctor_user.id  # internal user.id
 
     # Rule 1: one doctor per patient — block if already linked.
     if patient_detail.doctor_id is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "You are already linked to a doctor")
 
-    # Rules 1/2: block a second pending request (to any doctor).
+    # Rule 2: block a second pending request (to any doctor).
     pending = db.scalar(
         select(PatientDoctorRequest).where(
-            PatientDoctorRequest.patient_detail_id == patient_detail.id,
+            PatientDoctorRequest.patient_id == patient_user_id,
             PatientDoctorRequest.status == RequestStatus.PENDING,
         )
     )
     if pending is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "You already have a pending request")
 
-    # Re-use a prior row for this exact pair (unique constraint) — e.g. a
-    # previously REJECTED request being sent again.
+    # Re-use a prior row for this exact pair (a previously REJECTED request resent).
     req = db.scalar(
         select(PatientDoctorRequest).where(
-            PatientDoctorRequest.patient_detail_id == patient_detail.id,
+            PatientDoctorRequest.patient_id == patient_user_id,
             PatientDoctorRequest.doctor_id == doctor_id,
         )
     )
@@ -105,7 +106,7 @@ def create_request(
         req.responded_at = None
     else:
         req = PatientDoctorRequest(
-            patient_detail_id=patient_detail.id,
+            patient_id=patient_user_id,
             doctor_id=doctor_id,
             status=RequestStatus.PENDING,
         )
@@ -123,20 +124,19 @@ def create_request(
 def list_doctor_patients(db: Session, doctor: Doctor, page: int = 1, size: int = 10) -> dict[str, Any]:
     page, size, offset = _clamp_page(page, size)
     total = db.scalar(
-        select(func.count()).select_from(PatientDetail).where(PatientDetail.doctor_id == doctor.id)
+        select(func.count()).select_from(PatientDetail).where(PatientDetail.doctor_id == doctor.user_id)
     ) or 0
     rows = db.execute(
         select(PatientDetail, User)
         .join(User, PatientDetail.user_id == User.id)
-        .where(PatientDetail.doctor_id == doctor.id)
+        .where(PatientDetail.doctor_id == doctor.user_id)
         .order_by(PatientDetail.id)
         .offset(offset)
         .limit(size)
     ).all()
     items = [
         {
-            "patient_id": p.id,
-            "user_id": u.id,
+            "patient_id": u.guid,  # user GUID of the patient
             "first_name": u.first_name,
             "last_name": u.last_name,
             "nickname": p.nickname,
@@ -149,52 +149,52 @@ def list_doctor_patients(db: Session, doctor: Doctor, page: int = 1, size: int =
 # --- #3 pending requests ------------------------------------------------------
 def list_pending_requests(db: Session, doctor: Doctor) -> list[dict[str, Any]]:
     rows = db.execute(
-        select(PatientDoctorRequest, PatientDetail, User)
-        .join(PatientDetail, PatientDoctorRequest.patient_detail_id == PatientDetail.id)
-        .join(User, PatientDetail.user_id == User.id)
+        select(PatientDoctorRequest, User, PatientDetail)
+        .join(User, PatientDoctorRequest.patient_id == User.id)
+        .join(PatientDetail, PatientDetail.user_id == User.id)
         .where(
-            PatientDoctorRequest.doctor_id == doctor.id,
+            PatientDoctorRequest.doctor_id == doctor.user_id,
             PatientDoctorRequest.status == RequestStatus.PENDING,
         )
         .order_by(PatientDoctorRequest.created_at.desc())
     ).all()
     return [
         {
-            "request_id": r.id,
-            "patient_id": p.id,
-            "user_id": u.id,
+            "request_id": r.guid,
+            "patient_id": u.guid,  # user GUID of the patient
             "first_name": u.first_name,
             "last_name": u.last_name,
             "nickname": p.nickname,
             "requested_at": r.created_at,
         }
-        for r, p, u in rows
+        for r, u, p in rows
     ]
 
 
 # --- #4 approve / reject ------------------------------------------------------
-def _owned_pending(db: Session, doctor: Doctor, request_id: int) -> PatientDoctorRequest:
-    req = db.get(PatientDoctorRequest, request_id)
+def _owned_pending(db: Session, doctor: Doctor, request_guid) -> PatientDoctorRequest:
+    req = get_by_guid(db, PatientDoctorRequest, request_guid)
     # 404 (not 403) when it isn't this doctor's request — don't reveal others exist.
-    if req is None or req.doctor_id != doctor.id:
+    if req is None or req.doctor_id != doctor.user_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Request not found")
     if req.status != RequestStatus.PENDING:
         raise HTTPException(status.HTTP_409_CONFLICT, "Request has already been responded to")
     return req
 
 
-def approve_request(db: Session, doctor: Doctor, request_id: int) -> PatientDoctorRequest:
-    req = _owned_pending(db, doctor, request_id)
-    patient = db.get(PatientDetail, req.patient_detail_id)
+def approve_request(db: Session, doctor: Doctor, request_guid) -> PatientDoctorRequest:
+    req = _owned_pending(db, doctor, request_guid)
+    patient = db.scalar(select(PatientDetail).where(PatientDetail.user_id == req.patient_id))
 
     req.status = RequestStatus.APPROVED
     req.responded_at = _now()
-    patient.doctor_id = doctor.id  # the confirmed 1:1 link
+    if patient is not None:
+        patient.doctor_id = doctor.user_id  # confirmed link (doctor's user.id)
 
-    # One doctor per patient → auto-reject any other pending requests they made.
+    # One doctor per patient → auto-reject the patient's other pending requests.
     others = db.scalars(
         select(PatientDoctorRequest).where(
-            PatientDoctorRequest.patient_detail_id == req.patient_detail_id,
+            PatientDoctorRequest.patient_id == req.patient_id,
             PatientDoctorRequest.id != req.id,
             PatientDoctorRequest.status == RequestStatus.PENDING,
         )
@@ -208,8 +208,8 @@ def approve_request(db: Session, doctor: Doctor, request_id: int) -> PatientDoct
     return req
 
 
-def reject_request(db: Session, doctor: Doctor, request_id: int) -> PatientDoctorRequest:
-    req = _owned_pending(db, doctor, request_id)
+def reject_request(db: Session, doctor: Doctor, request_guid) -> PatientDoctorRequest:
+    req = _owned_pending(db, doctor, request_guid)
     req.status = RequestStatus.REJECTED
     req.responded_at = _now()
     db.commit()

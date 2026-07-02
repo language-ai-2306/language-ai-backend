@@ -6,12 +6,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.guid import get_by_guid
 from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.schemas.phrase import PhraseCreate, PhraseUpdate
 
 
-def get_or_404(db: Session, phrase_id: int) -> DisfluencyPhrase:
-    phrase = db.get(DisfluencyPhrase, phrase_id)
+def get_or_404(db: Session, phrase_guid) -> DisfluencyPhrase:
+    phrase = get_by_guid(db, DisfluencyPhrase, phrase_guid)
     if phrase is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Phrase not found")
     return phrase

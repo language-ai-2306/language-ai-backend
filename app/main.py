@@ -10,8 +10,10 @@ from app.api import (
     conversation,
     doctors,
     exercises,
+    my_plan,
     patients,
     phrases,
+    plans,
     proficiency,
     users,
 )
@@ -78,6 +80,16 @@ TAGS_METADATA = [
         "description": "Unified practice-game API. `{game}` = read-it-loud, picture-talk, "
                        "story-teller, or repeat-after-me. Each game: **start** (spoken intro), "
                        "**content** (next prompt + audio), **attempt** (analyse a recording).",
+    },
+    {
+        "name": "plans",
+        "description": "Doctor-authored tailored treatment plans. Build an ordered set of "
+                       "exercise assignments (by phoneme + difficulty), review progress, and "
+                       "advance items. Scoped to the doctor's approved patients.",
+    },
+    {
+        "name": "my-plan",
+        "description": "Patient-facing: the child's active plan and today's due exercises.",
     },
 ]
 
@@ -157,6 +169,8 @@ app.include_router(conversation.router)
 app.include_router(doctors.router)
 app.include_router(patients.router)
 app.include_router(exercises.router)
+app.include_router(plans.router)
+app.include_router(my_plan.router)
 # Legacy /v1/repeat-after-me/* routes removed — served by /v1/exercises/repeat-after-me/*.
 
 

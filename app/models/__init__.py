@@ -19,6 +19,13 @@ from app.models.doctor import Doctor
 from app.models.patient import PatientDetail, patient_ailment
 from app.models.patient_doctor_request import PatientDoctorRequest, RequestStatus
 from app.models.practice_attempt import PracticeAttempt
+from app.models.practice_plan import (
+    PlanItem,
+    PlanItemAttempt,
+    PlanItemStatus,
+    PlanStatus,
+    PracticePlan,
+)
 from app.models.practice_skill import PracticeSkill
 from app.models.proficiency import ProficiencyTest, ProficiencyTestResponse
 from app.models.user import User, UserRole
@@ -41,6 +48,11 @@ __all__ = [
     "PatientDoctorRequest",
     "RequestStatus",
     "PracticeAttempt",
+    "PracticePlan",
+    "PlanItem",
+    "PlanItemAttempt",
+    "PlanStatus",
+    "PlanItemStatus",
     "PracticeSkill",
     "PhraseDelivery",
     "DeliveryContext",

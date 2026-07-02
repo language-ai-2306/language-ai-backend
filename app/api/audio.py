@@ -19,11 +19,13 @@ Requires the ML (transcription) service running, or pass use_mock=true.
 import logging
 import os
 import tempfile
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.core.guid import get_by_guid
 from app.analysis import pipeline
 from app.analysis.audio_utils import preprocess_audio, validate_audio
 from app.analysis.feedback import FeedbackGenerator
@@ -233,7 +235,7 @@ async def analyze_upload(
     responses={403: {"description": "Doctor role required"}},
 )
 def get_practice_skill(
-    user_id: int,
+    user_id: uuid.UUID,
     db: Session = Depends(get_db),
     _: User = Depends(require_role(UserRole.DOCTOR)),
 ) -> PracticeSkillResponse:
@@ -241,4 +243,9 @@ def get_practice_skill(
     The patient's adaptive mastery state, one row per practised sound (worst
     first): current difficulty, mastery level, attempts, and recency-weighted %SS.
     """
-    return PracticeSkillResponse(**practice_planner.get_practice_skill(db, user_id))
+    patient = get_by_guid(db, User, user_id)
+    if patient is None:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    result = practice_planner.get_practice_skill(db, patient.id)
+    result["user_id"] = patient.guid
+    return PracticeSkillResponse(**result)

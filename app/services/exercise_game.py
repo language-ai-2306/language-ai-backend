@@ -96,7 +96,8 @@ class GameStrategy:
     def intro(self, name: str, character: str) -> str:
         raise NotImplementedError
 
-    def next_content(self, db: Session, user: User, difficulty: Difficulty) -> Optional[ContentDTO]:
+    def next_content(self, db: Session, user: User, difficulty: Difficulty,
+                     target_phoneme: Optional[str] = None) -> Optional[ContentDTO]:
         raise NotImplementedError
 
     async def submit(self, db: Session, user: User, content_id: str, audio_bytes: bytes,
@@ -129,12 +130,13 @@ class ContentBankGame(GameStrategy):
     def intro(self, name: str, character: str) -> str:
         return self._intro.format(name=name, char=character)
 
-    def next_content(self, db: Session, user: User, difficulty: Difficulty) -> Optional[ContentDTO]:
-        phrase = content_service.select_content(db, self.exercise_type, difficulty)
+    def next_content(self, db: Session, user: User, difficulty: Difficulty,
+                     target_phoneme: Optional[str] = None) -> Optional[ContentDTO]:
+        phrase = content_service.select_content(db, self.exercise_type, difficulty, target_phoneme)
         if phrase is None:
             return None
         return ContentDTO(
-            content_id=str(phrase.id),
+            content_id=str(phrase.guid),
             exercise_type=self.exercise_type,
             text=self._text_from(phrase),
             image_url=self._image_from(phrase),
@@ -190,13 +192,30 @@ class RepeatAfterMeGame(GameStrategy):
     def intro(self, name: str, character: str) -> str:
         return self._intro.format(name=name, char=character)
 
-    def next_content(self, db: Session, user: User, difficulty: Difficulty) -> Optional[ContentDTO]:
+    def next_content(self, db: Session, user: User, difficulty: Difficulty,
+                     target_phoneme: Optional[str] = None) -> Optional[ContentDTO]:
+        if target_phoneme:
+            # Plan pinned a specific sound → serve a phrase for exactly that phoneme.
+            phrase = content_service.select_content(
+                db, self.exercise_type, difficulty, target_phoneme
+            )
+            if phrase is None:
+                return None
+            return ContentDTO(
+                content_id=str(phrase.guid),
+                exercise_type=self.exercise_type,
+                text=phrase.sentence,
+                image_url=None,
+                tts_text=phrase.sentence,
+                reason=f"targeting /{target_phoneme}/",
+            )
+        # Free practice → the existing adaptive planner (personalised to problem sounds).
         result = practice_planner.next_phrase(db, user.id, difficulty)
         if result is None:
             return None
         phrase = result["phrase"]
         return ContentDTO(
-            content_id=str(phrase.id),  # phrase id as a string (unified content_id type)
+            content_id=str(phrase.guid),  # phrase GUID (unified content_id)
             exercise_type=self.exercise_type,
             text=phrase.sentence,
             image_url=None,
@@ -208,11 +227,7 @@ class RepeatAfterMeGame(GameStrategy):
                      filename: Optional[str], use_mock: bool) -> dict[str, Any]:
         from app.api.audio import _analyse_recording
 
-        try:
-            phrase_id = int(content_id)
-        except (TypeError, ValueError):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Phrase not found")
-        phrase = db.get(DisfluencyPhrase, phrase_id)
+        phrase = content_service.get_content(db, content_id)  # by GUID
         if phrase is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Phrase not found")
 
@@ -237,7 +252,7 @@ class RepeatAfterMeGame(GameStrategy):
         except Exception:  # noqa: BLE001
             logger.warning("RAM feedback loop failed for attempt %s", attempt.id, exc_info=True)
 
-        return _result_response(attempt.id, self.exercise_type, content_id, result, audio_url)
+        return _result_response(attempt.guid, self.exercise_type, content_id, result, audio_url)
 
 
 # ── Registry ─────────────────────────────────────────────────────────────────

@@ -46,10 +46,11 @@ class PatientDetail(AbstractEntity):
         unique=True,
     )
 
-    # Optional foreign key -> nullable=True. ondelete="SET NULL" means: if the
-    # doctor is deleted, the patient is kept but their doctor_id becomes empty.
+    # The assigned doctor, stored as the doctor's user.id (NOT doctor_details.id):
+    # every person reference in the app keys on the `user` table. Set on approval.
+    # SET NULL keeps the patient if the doctor's account is removed.
     doctor_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("doctor_details.id", ondelete="SET NULL"),
+        ForeignKey("user.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -61,8 +62,8 @@ class PatientDetail(AbstractEntity):
     nickname: Mapped[str] = mapped_column(String(100), nullable=False)
 
     # Python-side conveniences for loading the related objects.
-    user: Mapped["User"] = relationship()  # noqa: F821
-    doctor: Mapped[Optional["Doctor"]] = relationship()  # noqa: F821
+    # doctor_id also FKs to `user`, so disambiguate which column links `user`.
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])  # noqa: F821
     avatar: Mapped[Optional["Avatar"]] = relationship()  # noqa: F821
 
     # The ailments this patient is practicing (many-to-many via patient_ailment).

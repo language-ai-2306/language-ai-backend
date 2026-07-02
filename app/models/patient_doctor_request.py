@@ -30,16 +30,17 @@ class PatientDoctorRequest(AbstractEntity):
     __table_args__ = (
         # At most one request row per patient–doctor pair. A previously REJECTED
         # pair is re-used (flipped back to PENDING) rather than duplicated.
-        UniqueConstraint("patient_detail_id", "doctor_id", name="uq_patient_doctor_pair"),
+        UniqueConstraint("patient_id", "doctor_id", name="uq_patient_doctor_pair"),
     )
 
-    patient_detail_id: Mapped[int] = mapped_column(
-        ForeignKey("patient_detail.id", ondelete="CASCADE"),
+    # Both are user.id values (every person reference keys on the `user` table).
+    patient_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     doctor_id: Mapped[int] = mapped_column(
-        ForeignKey("doctor_details.id", ondelete="CASCADE"),
+        ForeignKey("user.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -52,6 +53,3 @@ class PatientDoctorRequest(AbstractEntity):
     # When the doctor approved/rejected it. NULL while PENDING. (`created_at` from
     # AbstractEntity is the "requested at" time.)
     responded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
-    patient: Mapped["PatientDetail"] = relationship()  # noqa: F821
-    doctor: Mapped["Doctor"] = relationship()  # noqa: F821

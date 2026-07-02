@@ -206,7 +206,7 @@ async def process_turn(
         logger.warning("disfluency tracking failed for turn %s", turn.id, exc_info=True)
 
     return {
-        "turn_id": turn.id,
+        "turn_id": turn.guid,
         "session_id": session_id,
         "turn_number": turn_number,
         "child_transcript": transcript,

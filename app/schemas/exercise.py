@@ -1,5 +1,6 @@
 """Schemas for the unified `/v1/exercises/{game}` API."""
 
+import uuid
 from typing import Any, List, Optional
 
 from pydantic import BaseModel
@@ -29,9 +30,9 @@ class ExerciseContentResponse(BaseModel):
 class ExerciseAttemptResponse(BaseModel):
     """Result of analysing a recorded attempt."""
 
-    attempt_id: Optional[int] = None  # PracticeAttempt id for RAM; None for file-backed games (not persisted)
+    attempt_id: Optional[uuid.UUID] = None  # PracticeAttempt GUID for RAM; None for file-backed games (not persisted)
     exercise_type: str
-    content_id: Optional[str] = None
+    content_id: Optional[str] = None         # phrase GUID (as string)
     transcript: Optional[str] = None
     scores: dict[str, Any]
     disfluencies: List[dict[str, Any]]

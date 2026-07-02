@@ -15,14 +15,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import uuid
+
 from app.config.settings import settings
 from app.core.deps import require_role
+from app.core.guid import get_by_guid
 from app.services import config_service, disfluency_tracker
 
 logger = logging.getLogger(__name__)
 from app.db.base import get_db
 from app.models.delivery import DeliveryContext
-from app.models.disfluency import Difficulty
+from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.models.proficiency import ProficiencyTest, ProficiencyTestResponse
 from app.models.user import User, UserRole
 from app.schemas.proficiency import (
@@ -64,17 +67,17 @@ def start_test(
     record_deliveries(db, current_user.id, phrases, DeliveryContext.PROFICIENCY_TEST)
 
     db.commit()
-    return ProficiencyStartResponse(test_id=test.id, phrases=phrases)
+    return ProficiencyStartResponse(test_id=test.guid, phrases=phrases)
 
 
 @router.post("/{test_id}/submit", response_model=ProficiencyResult)
 def submit_test(
-    test_id: int,
+    test_id: uuid.UUID,
     payload: ProficiencySubmit,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.PATIENT)),
 ) -> ProficiencyTest:
-    test = db.get(ProficiencyTest, test_id)
+    test = get_by_guid(db, ProficiencyTest, test_id)
     if test is None or test.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Test not found")
     if test.is_completed:
@@ -82,12 +85,16 @@ def submit_test(
             status_code=status.HTTP_409_CONFLICT, detail="Test already submitted"
         )
 
-    # Store each per-phrase response (full responses, per your design).
+    # Store each per-phrase response. The API sends phrase GUIDs; resolve each to
+    # its internal id for the FK column (skip unknown phrases).
     for item in payload.responses:
+        phrase = get_by_guid(db, DisfluencyPhrase, item.phrase_id)
+        if phrase is None:
+            continue
         db.add(
             ProficiencyTestResponse(
                 test_id=test.id,
-                phrase_id=item.phrase_id,
+                phrase_id=phrase.id,
                 score=item.score,
                 is_correct=item.is_correct,
             )

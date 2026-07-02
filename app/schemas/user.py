@@ -12,6 +12,7 @@ password rule. These are exactly the "specific format" / "at least 8 chars"
 rules from your table design — enforced here, at the edge.
 """
 
+import uuid
 from datetime import date, datetime
 from typing import Optional
 
@@ -34,9 +35,9 @@ class UserBase(BaseModel):
 class UserRead(BaseModel):
     """What we send BACK about a user. No password, ever."""
 
-    model_config = ConfigDict(from_attributes=True)  # allow building from a DB object
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: int
+    id: uuid.UUID = Field(validation_alias="guid")  # public id is the GUID
     email: EmailStr
     role: UserRole
     first_name: str
