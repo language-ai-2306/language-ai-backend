@@ -25,6 +25,10 @@ class PatientSignup(UserBase):
     # Optional: request a doctor during signup (doctor's user GUID). Creates a PENDING
     # link request (the doctor must still approve). Invalid guid → 404, signup rolls back.
     doctor_id: Optional[uuid.UUID] = None
+    # Guardian details — required by the UI for minors; optional here.
+    guardian_name: Optional[str] = Field(default=None, max_length=100)
+    guardian_relationship: Optional[str] = Field(default=None, max_length=32)
+    guardian_email: Optional[str] = Field(default=None, max_length=320)
 
 
 class DoctorSignup(UserBase):

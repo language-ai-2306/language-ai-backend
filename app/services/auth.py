@@ -42,6 +42,9 @@ def signup(db: Session, payload: SignupPayload) -> User:
             user_id=user.id,
             nickname=payload.nickname,
             avatar_id=payload.avatar_id,
+            guardian_name=payload.guardian_name,
+            guardian_relationship=payload.guardian_relationship,
+            guardian_email=payload.guardian_email,
         )
         if payload.ailment_ids:
             patient.ailments = list(

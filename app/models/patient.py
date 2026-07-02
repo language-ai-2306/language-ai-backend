@@ -61,6 +61,11 @@ class PatientDetail(AbstractEntity):
 
     nickname: Mapped[str] = mapped_column(String(100), nullable=False)
 
+    # Guardian details — collected for minors at signup; NULL for adults.
+    guardian_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    guardian_relationship: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    guardian_email: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+
     # Python-side conveniences for loading the related objects.
     # doctor_id also FKs to `user`, so disambiguate which column links `user`.
     user: Mapped["User"] = relationship(foreign_keys=[user_id])  # noqa: F821
