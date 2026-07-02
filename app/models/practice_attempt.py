@@ -39,6 +39,21 @@ class PracticeAttempt(AbstractEntity):
         index=True,
     )
 
+    # Which game produced this attempt (REPEAT_AFTER_ME / READ_IT_LOUD /
+    # PICTURE_TALK / STORY_TELLER). Lets the dashboard slice fluency per game.
+    exercise_type: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+
+    # The MARKER for a planned attempt. NULL → free/random play; set → this rep
+    # belongs to a plan-item session (a specific occurrence the SLP assigned).
+    # The plan item is reached THROUGH the session (session.plan_item_id) — it is
+    # NOT duplicated here. SET NULL on delete so the fluency history survives even
+    # if the plan (and its sessions) is removed.
+    plan_item_session_id: Mapped[int | None] = mapped_column(
+        ForeignKey("plan_item_session.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # The target text the patient was asked to say, and what they actually said.
     reference_phrase: Mapped[str] = mapped_column(Text, nullable=False)
     transcript: Mapped[str | None] = mapped_column(Text, nullable=True)

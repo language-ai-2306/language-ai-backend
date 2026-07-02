@@ -1,6 +1,8 @@
 """Schemas for the unified `/v1/exercises/{game}` API."""
 
 import uuid
+from datetime import date
+
 from typing import Any, List, Optional
 
 from pydantic import BaseModel
@@ -12,6 +14,15 @@ class ExerciseIntroResponse(BaseModel):
     exercise_type: str
     text: str
     audio: Optional[str] = None  # base64 MP3 (Ollie's voice)
+
+
+class ExerciseSessionResponse(BaseModel):
+    """State of a plan-item session (returned by /end)."""
+
+    session_id: uuid.UUID
+    occurrence_date: date
+    status: str            # IN_PROGRESS / COMPLETED / SKIPPED
+    attempts_count: int
 
 
 class ExerciseContentResponse(BaseModel):

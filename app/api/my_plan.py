@@ -1,12 +1,18 @@
 """Patient-facing plan route — the child's active plan and today's due exercises."""
 
+import uuid
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_patient
 from app.db.base import get_db
 from app.models.patient import PatientDetail
-from app.schemas.practice_plan import MyPlanResponse, PatientDashboardResponse
+from app.schemas.practice_plan import (
+    MarkItemCompleteResponse,
+    MyPlanResponse,
+    PatientDashboardResponse,
+)
 from app.services import practice_plan as service
 
 router = APIRouter(tags=["my-plan"])
@@ -39,3 +45,20 @@ def my_plan(
     today's attempt count and whether it's still due (per its dosage). Empty if the
     patient has no active plan."""
     return service.get_my_plan(db, patient)
+
+
+@router.post(
+    "/v1/my-plan/items/{item_id}/complete",
+    response_model=MarkItemCompleteResponse,
+    summary="Mark a plan item completed for today (call when the exercise finishes)",
+)
+def complete_item(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    patient: PatientDetail = Depends(get_current_patient),
+) -> MarkItemCompleteResponse:
+    """Logs a completion for this item so it stops showing as `due` today once the
+    per-session dosage is met. `item_id` is the plan item's GUID (from the
+    dashboard / my-plan payload). Not scored — see the exercise `/attempt` endpoint
+    for scored practice that also drives difficulty advancement."""
+    return service.mark_item_done(db, patient, item_id)

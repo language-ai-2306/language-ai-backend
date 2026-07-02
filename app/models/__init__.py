@@ -21,7 +21,8 @@ from app.models.patient_doctor_request import PatientDoctorRequest, RequestStatu
 from app.models.practice_attempt import PracticeAttempt
 from app.models.practice_plan import (
     PlanItem,
-    PlanItemAttempt,
+    PlanItemSession,
+    PlanItemSessionStatus,
     PlanItemStatus,
     PlanStatus,
     PracticePlan,
@@ -50,7 +51,8 @@ __all__ = [
     "PracticeAttempt",
     "PracticePlan",
     "PlanItem",
-    "PlanItemAttempt",
+    "PlanItemSession",
+    "PlanItemSessionStatus",
     "PlanStatus",
     "PlanItemStatus",
     "PracticeSkill",

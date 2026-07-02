@@ -117,6 +117,13 @@ class MyPlanResponse(BaseModel):
     items: List[MyPlanItem] = Field(default_factory=list)
 
 
+class MarkItemCompleteResponse(BaseModel):
+    item_id: uuid.UUID
+    attempts_today: int
+    due: bool          # still due today? (false once dosage is met)
+    completed: bool = True
+
+
 class DashboardWeekItem(BaseModel):
     item_id: uuid.UUID
     plan_id: uuid.UUID
@@ -146,6 +153,9 @@ class ItemProgress(BaseModel):
     total_attempts: int
     avg_fluency: Optional[float] = None
     last_attempt_at: Optional[datetime] = None
+    # Adherence: how many occurrences the child has started vs finished.
+    sessions_total: int = 0
+    sessions_completed: int = 0
 
 
 class PlanProgressResponse(BaseModel):

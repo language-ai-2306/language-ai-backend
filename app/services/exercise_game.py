@@ -32,6 +32,7 @@ from sqlalchemy.orm import Session
 
 from app.models.disfluency import Difficulty, DisfluencyPhrase
 from app.models.exercise import ExerciseType
+from app.models.practice_plan import PlanItemSession
 from app.models.user import User
 from app.services import disfluency_tracker, exercise_content as content_service
 from app.services import practice_planner, storage
@@ -101,7 +102,8 @@ class GameStrategy:
         raise NotImplementedError
 
     async def submit(self, db: Session, user: User, content_id: str, audio_bytes: bytes,
-                     filename: Optional[str], use_mock: bool) -> dict[str, Any]:
+                     filename: Optional[str], use_mock: bool,
+                     session: Optional[PlanItemSession] = None) -> dict[str, Any]:
         raise NotImplementedError
 
 
@@ -144,7 +146,8 @@ class ContentBankGame(GameStrategy):
         )
 
     async def submit(self, db: Session, user: User, content_id: str, audio_bytes: bytes,
-                     filename: Optional[str], use_mock: bool) -> dict[str, Any]:
+                     filename: Optional[str], use_mock: bool,
+                     session: Optional[PlanItemSession] = None) -> dict[str, Any]:
         # Import here to avoid a circular import at module load (audio → services).
         from app.api.audio import _analyse_free_recording, _analyse_recording
 
@@ -153,8 +156,8 @@ class ContentBankGame(GameStrategy):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Exercise content not found")
 
         child_age = _age_from_dob(user)
+        reference = self._reference_from(phrase) or ""
         if self.scoring == "reference":
-            reference = self._reference_from(phrase) or ""
             result, wav_bytes = await _analyse_recording(
                 audio_bytes, filename, reference, child_age, use_mock
             )
@@ -165,8 +168,21 @@ class ContentBankGame(GameStrategy):
 
         audio_url = _upload_audio(wav_bytes, user.id)
 
-        # Attempts aren't persisted for these games; we still feed the shared
-        # disfluency profile (secondary — never break the response).
+        # Persist the attempt — the single source of truth for fluency data, for
+        # both free and planned play. `plan_item_id` marks a planned attempt.
+        attempt = practice_service.record_attempt(
+            db,
+            user_id=user.id,
+            reference_phrase=reference or self._text_from(phrase) or "",
+            result=result,
+            phrase_id=phrase.id,
+            child_age=child_age,
+            audio_url=audio_url,
+            exercise_type=self.exercise_type.value,
+            plan_item_session_id=(session.id if session is not None else None),
+        )
+
+        # Feed the shared disfluency profile (secondary — never break the response).
         try:
             disfluency_tracker.record_occurrences(
                 db,
@@ -177,7 +193,7 @@ class ContentBankGame(GameStrategy):
         except Exception:  # noqa: BLE001
             logger.warning("disfluency tracking failed for %s attempt", self.slug, exc_info=True)
 
-        return _result_response(None, self.exercise_type, content_id, result, audio_url)
+        return _result_response(attempt.guid, self.exercise_type, content_id, result, audio_url)
 
 
 # ── Repeat After Me — unified surface over the existing RAM services ──────────
@@ -224,7 +240,8 @@ class RepeatAfterMeGame(GameStrategy):
         )
 
     async def submit(self, db: Session, user: User, content_id: str, audio_bytes: bytes,
-                     filename: Optional[str], use_mock: bool) -> dict[str, Any]:
+                     filename: Optional[str], use_mock: bool,
+                     session: Optional[PlanItemSession] = None) -> dict[str, Any]:
         from app.api.audio import _analyse_recording
 
         phrase = content_service.get_content(db, content_id)  # by GUID
@@ -242,9 +259,11 @@ class RepeatAfterMeGame(GameStrategy):
             user_id=user.id,
             reference_phrase=result["reference_phrase"],
             result=result,
-            phrase_id=phrase_id,
+            phrase_id=phrase.id,
             child_age=child_age,
             audio_url=audio_url,
+            exercise_type=self.exercise_type.value,
+            plan_item_session_id=(session.id if session is not None else None),
         )
         # RAM's own feedback loop feeds the profile AND updates per-sound mastery.
         try:

@@ -6,15 +6,16 @@ Structure:
   * each PlanItem is ONE game (exercise_type) with its phoneme (drill games only),
     difficulty, schedule (frequency + days + duration), and advancement gate.
 
-PlanItemAttempt logs each attempt on an item, driving advancement + progress review.
-Plans REFERENCE content already in `disfluency_phrase` (exercise_type + difficulty +
-target_phoneme) — there is no separate plan-content table.
+Attempts on a plan item are NOT stored here — every attempt (planned or free) is a
+`practice_attempt` row; a planned one carries `plan_item_id`. That single table drives
+advancement + progress review. Plans REFERENCE content already in `disfluency_phrase`
+(exercise_type + difficulty + target_phoneme) — there is no separate plan-content table.
 """
 
 import enum
-from datetime import date, datetime
+from datetime import date
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -34,6 +35,12 @@ class PlanItemStatus(str, enum.Enum):
     LOCKED = "LOCKED"        # not yet unlocked (earlier items must complete first)
     ACTIVE = "ACTIVE"        # currently practisable
     COMPLETED = "COMPLETED"  # advancement criteria met
+
+
+class PlanItemSessionStatus(str, enum.Enum):
+    IN_PROGRESS = "IN_PROGRESS"  # opened; fewer than reps_per_session attempts so far
+    COMPLETED = "COMPLETED"      # dosage met (or manually marked done)
+    SKIPPED = "SKIPPED"          # occurrence explicitly skipped
 
 
 class PracticePlan(AbstractEntity):
@@ -101,10 +108,18 @@ class PlanItem(AbstractEntity):
     )
 
 
-class PlanItemAttempt(AbstractEntity):
-    """Plan-scoped attempt log — one row each time the patient practises an item."""
+class PlanItemSession(AbstractEntity):
+    """One scheduled OCCURRENCE of a plan item — e.g. "Monday of week 3".
 
-    __tablename__ = "plan_item_attempt"
+    A plan item is a single row for the whole (possibly months-long, recurring)
+    course; each time its scheduled day comes round the child does a *session*.
+    A session groups that day's reps: it is created lazily on the first attempt of
+    the day and completes once `reps_per_session` attempts land. This is the entity
+    that gives each occurrence its own identity + status, which a bare
+    `plan_item_id` on the attempt could not.
+    """
+
+    __tablename__ = "plan_item_session"
 
     plan_item_id: Mapped[int] = mapped_column(
         ForeignKey("plan_item.id", ondelete="CASCADE"), nullable=False, index=True
@@ -112,6 +127,15 @@ class PlanItemAttempt(AbstractEntity):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    fluency_score: Mapped[float | None] = mapped_column(Float, nullable=True)
-    result: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # The calendar date of this occurrence (one session per item per day).
+    occurrence_date: Mapped[date] = mapped_column(nullable=False)
+    status: Mapped[PlanItemSessionStatus] = mapped_column(
+        SAEnum(PlanItemSessionStatus, name="plan_item_session_status_enum"),
+        nullable=False,
+        default=PlanItemSessionStatus.IN_PROGRESS,
+    )
+    attempts_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    __table_args__ = (
+        UniqueConstraint("plan_item_id", "occurrence_date", name="uq_session_item_date"),
+    )

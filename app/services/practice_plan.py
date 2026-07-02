@@ -16,9 +16,11 @@ from app.models.disfluency import Difficulty
 from app.models.doctor import Doctor
 from app.models.exercise import ExerciseType
 from app.models.patient import PatientDetail
+from app.models.practice_attempt import PracticeAttempt
 from app.models.practice_plan import (
     PlanItem,
-    PlanItemAttempt,
+    PlanItemSession,
+    PlanItemSessionStatus,
     PlanItemStatus,
     PlanStatus,
     PracticePlan,
@@ -279,12 +281,26 @@ def get_progress(db: Session, doctor: Doctor, plan_guid) -> dict[str, Any]:
     for item in plan.items:
         agg = db.execute(
             select(
-                func.count(PlanItemAttempt.id),
-                func.avg(PlanItemAttempt.fluency_score),
-                func.max(PlanItemAttempt.attempted_at),
-            ).where(PlanItemAttempt.plan_item_id == item.id)
+                func.count(PracticeAttempt.id),
+                func.avg(PracticeAttempt.fluency_score),
+                func.max(PracticeAttempt.created_at),
+            )
+            .join(PlanItemSession, PracticeAttempt.plan_item_session_id == PlanItemSession.id)
+            .where(PlanItemSession.plan_item_id == item.id)
         ).first()
         total, avg_fluency, last_at = agg if agg else (0, None, None)
+
+        # Adherence: sessions started vs completed for this occurrence-based item.
+        sess = db.execute(
+            select(
+                func.count(PlanItemSession.id),
+                func.count(PlanItemSession.id).filter(
+                    PlanItemSession.status == PlanItemSessionStatus.COMPLETED
+                ),
+            ).where(PlanItemSession.plan_item_id == item.id)
+        ).first()
+        sessions_total, sessions_completed = sess if sess else (0, 0)
+
         items.append(
             {
                 "item_id": item.guid,
@@ -295,6 +311,8 @@ def get_progress(db: Session, doctor: Doctor, plan_guid) -> dict[str, Any]:
                 "total_attempts": int(total or 0),
                 "avg_fluency": round(float(avg_fluency), 1) if avg_fluency is not None else None,
                 "last_attempt_at": last_at,
+                "sessions_total": int(sessions_total or 0),
+                "sessions_completed": int(sessions_completed or 0),
             }
         )
     return {"plan_id": plan.guid, "title": plan.title, "items": items}
@@ -312,16 +330,45 @@ def _active_plans(db: Session, patient: PatientDetail) -> list[PracticePlan]:
     )
 
 
-def _attempts_today(db: Session, item_id: int, today_dt: datetime) -> int:
+def _today_session(db: Session, item_id: int, today: date) -> Optional[PlanItemSession]:
+    """Today's occurrence for this item, if one has been opened."""
+    return db.scalar(
+        select(PlanItemSession).where(
+            PlanItemSession.plan_item_id == item_id,
+            PlanItemSession.occurrence_date == today,
+        )
+    )
+
+
+def _completed_count(db: Session, item_id: int, dates: list[date]) -> int:
+    """How many COMPLETED sessions this item has on any of the given dates.
+
+    Uses the range (not the exact scheduled weekday) so completing a weekly item a
+    day early/late still counts as done for the week.
+    """
+    if not dates:
+        return 0
     return int(
         db.scalar(
-            select(func.count(PlanItemAttempt.id)).where(
-                PlanItemAttempt.plan_item_id == item_id,
-                PlanItemAttempt.attempted_at >= today_dt,
+            select(func.count(PlanItemSession.id)).where(
+                PlanItemSession.plan_item_id == item_id,
+                PlanItemSession.occurrence_date.in_(dates),
+                PlanItemSession.status == PlanItemSessionStatus.COMPLETED,
             )
         )
         or 0
     )
+
+
+def _today_progress(session: Optional[PlanItemSession]) -> tuple[int, bool]:
+    """(attempts_today, due) for a scheduled item, from today's session.
+
+    An item is DUE until its session is explicitly COMPLETED (via /end). No
+    session yet, or a session still IN_PROGRESS → still due.
+    """
+    attempts_today = session.attempts_count if session is not None else 0
+    done = session is not None and session.status == PlanItemSessionStatus.COMPLETED
+    return attempts_today, not done
 
 
 def get_my_plan(db: Session, patient: PatientDetail) -> dict[str, Any]:
@@ -335,8 +382,11 @@ def get_my_plan(db: Session, patient: PatientDetail) -> dict[str, Any]:
                 continue
             if not _scheduled_today(item.frequency, item.schedule, today):
                 continue
-            attempts_today = _attempts_today(db, item.id, today_dt)
-            reps = int((item.dosage or {}).get("reps_per_session", 1) or 1)
+            session = _today_session(db, item.id, today)
+            # Finished today's occurrence → drop it from the list.
+            if session is not None and session.status == PlanItemSessionStatus.COMPLETED:
+                continue
+            attempts_today, due = _today_progress(session)
             items.append(
                 {
                     "item_id": item.guid,
@@ -350,10 +400,32 @@ def get_my_plan(db: Session, patient: PatientDetail) -> dict[str, Any]:
                     "dosage": item.dosage,
                     "status": item.status,
                     "attempts_today": attempts_today,
-                    "due": attempts_today < reps,
+                    "due": due,
                 }
             )
     return {"items": items}
+
+
+def mark_item_done(db: Session, patient: PatientDetail, item_guid) -> dict[str, Any]:
+    """Patient marks a plan item done for today from the dashboard — same effect as
+    the exercise /end call: completes today's session. Find-or-creates the session
+    first, so it works even if the exercise flow was never started."""
+    from app.services import plan_progress
+
+    item = get_by_guid(db, PlanItem, item_guid)
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Plan item not found")
+    plan = db.get(PracticePlan, item.plan_id)
+    if plan is None or plan.patient_id != patient.user_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Plan item not found")
+
+    session = plan_progress.complete_session(db, patient.user, item)
+    return {
+        "item_id": item.guid,
+        "attempts_today": session.attempts_count,
+        "due": False,
+        "completed": True,
+    }
 
 
 def get_dashboard(db: Session, patient: PatientDetail) -> dict[str, Any]:
@@ -370,12 +442,15 @@ def get_dashboard(db: Session, patient: PatientDetail) -> dict[str, Any]:
         for item in plan.items:
             if item.status != PlanItemStatus.ACTIVE:
                 continue
-            scheduled_days = [
-                _WEEKDAYS[d.weekday()]
-                for d in week_dates
-                if _scheduled_today(item.frequency, item.schedule, d)
+            scheduled_dates = [
+                d for d in week_dates if _scheduled_today(item.frequency, item.schedule, d)
             ]
-            if not scheduled_days:
+            if not scheduled_dates:
+                continue
+
+            # Done for the week? (all of this week's scheduled occurrences completed)
+            # → drop the item from the dashboard entirely.
+            if _completed_count(db, item.id, week_dates) >= len(scheduled_dates):
                 continue
 
             base = {
@@ -388,19 +463,23 @@ def get_dashboard(db: Session, patient: PatientDetail) -> dict[str, Any]:
                 "frequency": item.frequency,
                 "duration_minutes": item.duration_minutes,
             }
-            week_items.append({**base, "scheduled_days": scheduled_days})
+            week_items.append(
+                {**base, "scheduled_days": [_WEEKDAYS[d.weekday()] for d in scheduled_dates]}
+            )
 
+            # Today's to-do: scheduled today AND today's occurrence not yet completed.
             if _scheduled_today(item.frequency, item.schedule, today):
-                attempts_today = _attempts_today(db, item.id, today_dt)
-                reps = int((item.dosage or {}).get("reps_per_session", 1) or 1)
-                today_items.append(
-                    {
-                        **base,
-                        "dosage": item.dosage,
-                        "status": item.status,
-                        "attempts_today": attempts_today,
-                        "due": attempts_today < reps,
-                    }
-                )
+                session = _today_session(db, item.id, today)
+                if session is None or session.status != PlanItemSessionStatus.COMPLETED:
+                    attempts_today, due = _today_progress(session)
+                    today_items.append(
+                        {
+                            **base,
+                            "dosage": item.dosage,
+                            "status": item.status,
+                            "attempts_today": attempts_today,
+                            "due": due,
+                        }
+                    )
 
     return {"today": today_items, "weekly": week_items}

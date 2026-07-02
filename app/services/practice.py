@@ -26,8 +26,14 @@ def record_attempt(
     phrase_id: int | None = None,
     child_age: int | None = None,
     audio_url: str | None = None,
+    exercise_type: str | None = None,
+    plan_item_session_id: int | None = None,
 ) -> PracticeAttempt:
-    """Persist one analysed Repeat-After-Me attempt and return the saved row.
+    """Persist one analysed exercise attempt and return the saved row.
+
+    Handles every game (Repeat After Me, Read It Loud, Picture Talk, Story Teller),
+    for both free play and planned play — it is the single source of truth for
+    fluency data.
 
     Args:
         db:               SQLAlchemy session (caller owns the transaction lifetime;
@@ -38,6 +44,9 @@ def record_attempt(
         phrase_id:        FK to the catalogued phrase, if this attempt used one.
         child_age:        Age used to calibrate scoring/feedback.
         audio_url:        S3 URL of the recording, if uploaded.
+        exercise_type:    Which game produced the attempt.
+        plan_item_session_id: The plan-item session it belongs to (None for free play).
+                          The plan item is reached via the session, not stored here.
     """
     scores: dict[str, Any] = result.get("scores", {}) or {}
     recognition: dict[str, Any] = result.get("recognition", {}) or {}
@@ -45,6 +54,8 @@ def record_attempt(
     attempt = PracticeAttempt(
         user_id=user_id,
         phrase_id=phrase_id,
+        exercise_type=exercise_type,
+        plan_item_session_id=plan_item_session_id,
         reference_phrase=reference_phrase,
         transcript=result.get("transcript"),
         audio_url=audio_url,
