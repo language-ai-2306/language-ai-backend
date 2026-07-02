@@ -15,6 +15,7 @@ from app.api import (
     phrases,
     plans,
     proficiency,
+    slp,
     users,
 )
 from app.config.settings import settings
@@ -171,6 +172,7 @@ app.include_router(patients.router)
 app.include_router(exercises.router)
 app.include_router(plans.router)
 app.include_router(my_plan.router)
+app.include_router(slp.router)
 # Legacy /v1/repeat-after-me/* routes removed — served by /v1/exercises/repeat-after-me/*.
 
 
